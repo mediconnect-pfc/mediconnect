@@ -1,13 +1,401 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// ══════════════════════════════════════════════
+// MediConnect — Prisma Schema
+// ══════════════════════════════════════════════
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════
+// ENUMS
+// ══════════════════════════════════════════════
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+  CAISSIER
+}
+
+enum EstabType {
+  CLINIC
+  HOSPITAL
+  PHARMACY
+}
+
+enum PlanType {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum InteractionType {
+  CALL
+  SMS
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum NotificationChannel {
+  SMS
+  CALL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum CampaignType {
+  SMS
+  VOICE
+  EMERGENCY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  PAUSED
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum AnalyseStatus {
+  PENDING
+  IMPORTED
+  COMMENTED
+  ARCHIVED
+}
+
+enum FactureStatus {
+  PENDING
+  PAID
+  UNPAID
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+}
+
+// ══════════════════════════════════════════════
+// SUPER ADMIN
+// ══════════════════════════════════════════════
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("super_admins")
+}
+
+// ══════════════════════════════════════════════
+// ESTABLISHMENT
+// ══════════════════════════════════════════════
+
+model Establishment {
+  id        String    @id @default(uuid())
+  name      String
+  type      EstabType
+  plan      PlanType  @default(FREE)
+  phone     String
+  address   String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users     User[]
+  patients  Patient[]
+  campaigns Campaign[]
+
+  @@map("establishments")
+}
+
+// ══════════════════════════════════════════════
+// USER
+// ══════════════════════════════════════════════
+
+model User {
+  id              String   @id @default(uuid())
+  establishmentId String
+  name            String
+  email           String   @unique
+  password        String
+  role            UserRole
+  specialty       String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id])
+  appointments    Appointment[]
+  dossiers        DossierMedical[]
+  analyses        Analyse[]
+  factures        Facture[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+// ══════════════════════════════════════════════
+// PATIENT
+// ══════════════════════════════════════════════
+
+model Patient {
+  id              String    @id @default(uuid())
+  establishmentId String
+  name            String
+  phone           String
+  birthDate       DateTime?
+  tags            String[]
+  preferredLang   String    @default("fr")
+  consentAt       DateTime?
+  portalToken     String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  establishment    Establishment     @relation(fields: [establishmentId], references: [id])
+  appointments     Appointment[]
+  interactions     Interaction[]
+  notifications    Notification[]
+  dossiers         DossierMedical[]
+  analyses         Analyse[]
+  factures         Facture[]
+  campaignMessages CampaignMessage[]
+
+  @@map("patients")
+}
+
+// ══════════════════════════════════════════════
+// APPOINTMENT
+// ══════════════════════════════════════════════
+
+model Appointment {
+  id            String             @id @default(uuid())
+  patientId     String
+  doctorId      String
+  slot          DateTime
+  status        AppointmentStatus  @default(SCHEDULED)
+  confirmation  ConfirmationStatus @default(PENDING)
+  source        String             @default("manual")
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        User           @relation(fields: [doctorId], references: [id])
+  notifications Notification[]
+
+  @@map("appointments")
+}
+
+// ══════════════════════════════════════════════
+// INTERACTION
+// ══════════════════════════════════════════════
+
+model Interaction {
+  id         String          @id @default(uuid())
+  patientId  String
+  type       InteractionType
+  direction  Direction
+  transcript String?
+  sentiment  Sentiment?
+  intent     String?
+  duration   Int?
+  externalId String?
+  createdAt  DateTime        @default(now())
+
+  patient    Patient @relation(fields: [patientId], references: [id])
+
+  @@map("interactions")
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICATION
+// ══════════════════════════════════════════════
+
+model Notification {
+  id            String              @id @default(uuid())
+  patientId     String
+  appointmentId String?
+  channel       NotificationChannel
+  status        NotificationStatus  @default(PENDING)
+  message       String?
+  scheduledAt   DateTime
+  sentAt        DateTime?
+  externalId    String?
+  createdAt     DateTime            @default(now())
+
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@map("notifications")
+}
+
+// ══════════════════════════════════════════════
+// CAMPAIGN
+// ══════════════════════════════════════════════
+
+model Campaign {
+  id              String         @id @default(uuid())
+  establishmentId String
+  name            String
+  type            CampaignType
+  status          CampaignStatus @default(DRAFT)
+  segment         String?
+  message         String?
+  flowId          String?
+  scheduledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  establishment Establishment     @relation(fields: [establishmentId], references: [id])
+  messages      CampaignMessage[]
+
+  @@map("campaigns")
+}
+
+// ══════════════════════════════════════════════
+// CAMPAIGN MESSAGE
+// ══════════════════════════════════════════════
+
+model CampaignMessage {
+  id          String        @id @default(uuid())
+  campaignId  String
+  patientId   String
+  status      MessageStatus @default(PENDING)
+  deliveredAt DateTime?
+  externalRef String?
+  createdAt   DateTime      @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  @@map("campaign_messages")
+}
+
+// ══════════════════════════════════════════════
+// DOSSIER MEDICAL
+// ══════════════════════════════════════════════
+
+model DossierMedical {
+  id               String   @id @default(uuid())
+  patientId        String
+  medecinId        String
+  notes            String?
+  ordonnance       String?
+  consultationDate DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  patient  Patient   @relation(fields: [patientId], references: [id])
+  medecin  User      @relation(fields: [medecinId], references: [id])
+  analyses Analyse[]
+
+  @@map("dossiers_medicaux")
+}
+
+// ══════════════════════════════════════════════
+// ANALYSE
+// ══════════════════════════════════════════════
+
+model Analyse {
+  id          String        @id @default(uuid())
+  patientId   String
+  medecinId   String
+  dossierId   String?
+  type        String
+  resultatPDF String?
+  commentaire String?
+  status      AnalyseStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  patient  Patient         @relation(fields: [patientId], references: [id])
+  medecin  User            @relation(fields: [medecinId], references: [id])
+  dossier  DossierMedical? @relation(fields: [dossierId], references: [id])
+
+  @@map("analyses")
+}
+
+// ══════════════════════════════════════════════
+// FACTURE
+// ══════════════════════════════════════════════
+
+model Facture {
+  id        String        @id @default(uuid())
+  patientId String
+  caisierId String
+  montant   Float
+  methode   PaymentMethod @default(CASH)
+  status    FactureStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  patient  Patient @relation(fields: [patientId], references: [id])
+  caissier User    @relation(fields: [caisierId], references: [id])
+
+  @@map("factures")
+}
+
+// ══════════════════════════════════════════════
+// AUDIT LOG
+// ══════════════════════════════════════════════
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String
+  action       String
+  resourceType String
+  resourceId   String?
+  details      Json?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
 }
