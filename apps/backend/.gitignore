@@ -35,6 +35,9 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
+# Prisma seed (local copy with dev passwords — use seed.example.ts as template)
+prisma/seed.ts
+
 # dotenv environment variable files
 .env
 .env.development.local
