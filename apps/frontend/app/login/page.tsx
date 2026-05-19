@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -25,7 +27,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const res = await fetch('/auth/login', {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
