@@ -45,9 +45,11 @@ export class PatientsController {
     @Req() req: Request,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
     const safeLimit = Math.min(limit, 50);
-    return this.service.findAll(this.getEstId(req), page, safeLimit);
+    return this.service.findAll(this.getEstId(req), page, safeLimit, search, status);
   }
 
   @Get('search')
@@ -95,17 +97,48 @@ export class PatientsController {
     if (!file) throw new BadRequestException('Fichier CSV requis');
     if (!file.originalname.endsWith('.csv')) throw new BadRequestException('Le fichier doit être au format CSV');
 
-    let records: any[];
+    const raw = file.buffer.toString('utf-8');
+
+    let rows: string[][];
     try {
-      records = csv.parse(file.buffer.toString('utf-8'), {
-        columns: true,
+      rows = csv.parse(raw, {
         skip_empty_lines: true,
         trim: true,
+        relax_column_count: true,
         delimiter: [',', ';'],
-      });
+      }) as string[][];
     } catch {
       throw new BadRequestException('Fichier CSV invalide');
     }
+
+    if (rows.length === 0) throw new BadRequestException('Fichier vide');
+
+    const knownHeaders = ['firstName', 'lastName', 'firstname', 'lastname', 'prénom', 'nom', 'phone', 'téléphone', 'email', 'birthdate', 'date', 'tags'];
+    const first = rows[0];
+    const hasHeaders = first.some((h) => knownHeaders.includes(h.toLowerCase().trim()));
+
+    const records = hasHeaders
+      ? rows.slice(1).map((row) => {
+          const obj: any = {};
+          const headerRow = first.map((h) => h.toLowerCase().trim());
+          row.forEach((val, i) => {
+            const h = headerRow[i] || `col${i}`;
+            if (h.includes('first') || h === 'prénom') obj.firstName = val;
+            else if (h.includes('last') || h === 'nom') obj.lastName = val;
+            else if (h === 'phone' || h === 'téléphone') obj.phone = val;
+            else if (h === 'email') obj.email = val;
+            else if (h === 'birthdate' || h === 'date') obj.birthDate = val;
+            else if (h === 'tags') obj.tags = val;
+          });
+          return obj;
+        })
+      : rows.map((row) => ({
+          firstName: row[0] || '',
+          lastName: row[1] || '',
+          phone: row[2] || '',
+          birthDate: row[3] || null,
+          tags: row[4] || '',
+        }));
 
     return this.service.import(this.getEstId(req), records);
   }

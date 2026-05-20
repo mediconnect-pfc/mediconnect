@@ -11,12 +11,29 @@ export class PatientsService {
     establishmentId: string,
     page: number,
     limit: number,
+    search?: string,
+    status?: string,
   ) {
     const skip = (page - 1) * limit;
 
+    const where: any = { establishmentId, deletedAt: null };
+
+    if (search) {
+      const s = search.trim();
+      where.OR = [
+        { firstName: { contains: s, mode: 'insensitive' } },
+        { lastName: { contains: s, mode: 'insensitive' } },
+        { phone: { contains: s } },
+      ];
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.patient.findMany({
-        where: { establishmentId, deletedAt: null },
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -24,7 +41,7 @@ export class PatientsService {
           appointments: { take: 1, orderBy: { slot: 'desc' } },
         },
       }),
-      this.prisma.patient.count({ where: { establishmentId, deletedAt: null } }),
+      this.prisma.patient.count({ where }),
     ]);
 
     return {
