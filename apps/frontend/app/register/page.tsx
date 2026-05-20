@@ -60,7 +60,10 @@ export default function RegisterPage() {
         return
       }
 
-      if (data.token) localStorage.setItem('token', data.token)
+      if (data.token) {
+        localStorage.setItem('token', data.token)
+        document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`
+      }
       router.push('/dashboard')
     } catch {
       setError('Erreur de connexion au serveur')
