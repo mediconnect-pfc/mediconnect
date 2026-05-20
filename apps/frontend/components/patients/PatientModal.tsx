@@ -4,36 +4,50 @@ import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import type { Patient } from '@/types'
+
+interface PatientFormData {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  birthDate: string
+  address: string
+}
 
 interface PatientModalProps {
   open: boolean
   onClose: () => void
-  onSave: (data: Partial<Patient>) => Promise<void>
-  patient?: Patient | null
+  onSave: (data: PatientFormData) => Promise<string | void>
+  initial?: Partial<PatientFormData>
 }
 
-export default function PatientModal({ open, onClose, onSave, patient }: PatientModalProps) {
-  const [form, setForm] = useState({
-    name: patient?.name || '',
-    email: patient?.email || '',
-    phone: patient?.phone || '',
-    birthDate: patient?.birthDate || '',
-    address: patient?.address || '',
+export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
+  const [form, setForm] = useState<PatientFormData>({
+    firstName: initial?.firstName || '',
+    lastName: initial?.lastName || '',
+    email: initial?.email || '',
+    phone: initial?.phone || '',
+    birthDate: initial?.birthDate || '',
+    address: initial?.address || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name || !form.phone) {
-      setError('Nom et téléphone sont requis')
+    if (!form.firstName || !form.lastName || !form.phone) {
+      setError('Prénom, nom et téléphone sont requis')
       return
     }
     setSaving(true)
     setError('')
     try {
-      await onSave(form)
+      const err = await onSave(form)
+      if (err) {
+        setError(err)
+        setSaving(false)
+        return
+      }
       onClose()
     } catch {
       setError('Erreur lors de la sauvegarde')
@@ -46,24 +60,33 @@ export default function PatientModal({ open, onClose, onSave, patient }: Patient
     <Modal
       open={open}
       onClose={onClose}
-      title={patient ? 'Modifier le patient' : 'Nouveau patient'}
+      title={initial ? 'Modifier le patient' : 'Nouveau patient'}
       actions={
         <>
           <Button variant="secondary" onClick={onClose}>Annuler</Button>
           <Button loading={saving} onClick={handleSubmit}>
-            {patient ? 'Enregistrer' : 'Créer'}
+            {initial ? 'Enregistrer' : 'Créer'}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          id="name"
-          label="Nom complet"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          error={error && !form.name ? 'Nom requis' : undefined}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            id="firstName"
+            label="Prénom"
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            error={error && !form.firstName ? 'Requis' : undefined}
+          />
+          <Input
+            id="lastName"
+            label="Nom"
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            error={error && !form.lastName ? 'Requis' : undefined}
+          />
+        </div>
         <Input
           id="email"
           label="Email"
@@ -76,7 +99,7 @@ export default function PatientModal({ open, onClose, onSave, patient }: Patient
           label="Téléphone"
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          error={error && !form.phone ? 'Téléphone requis' : undefined}
+          error={error && !form.phone ? 'Requis' : undefined}
         />
         <Input
           id="birthDate"

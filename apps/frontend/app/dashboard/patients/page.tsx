@@ -9,7 +9,6 @@ import ImportCSVModal from '@/components/patients/ImportCSVModal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Pagination from '@/components/ui/Pagination'
-import type { Patient } from '@/types'
 
 const statusBadge: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
   ACTIF: 'success',
@@ -51,9 +50,10 @@ export default function PatientsPage() {
     fetchPatients(page, search, status)
   }, [page, fetchPatients, search, status])
 
-  async function handleCreate(data: Partial<Patient>) {
-    const p = await createPatient(data)
-    if (p) fetchPatients(page, search, status)
+  async function handleCreate(data: { firstName: string; lastName: string; phone: string; email: string; birthDate: string; address: string }) {
+    const { error } = await createPatient(data)
+    if (error) return error
+    fetchPatients(page, search, status)
   }
 
   async function handleImport(file: File) {
@@ -136,13 +136,15 @@ export default function PatientsPage() {
               patients.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900 sm:px-6">
-                    <Link href={`/dashboard/patients/${p.id}`} className="hover:text-blue-700">{p.name}</Link>
+                    <Link href={`/dashboard/patients/${p.id}`} className="hover:text-blue-700">
+                      {p.firstName} {p.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600 sm:px-6">{p.phone}</td>
                   <td className="hidden px-4 py-3 text-gray-600 sm:table-cell sm:px-6">{p.lastAppointment || '—'}</td>
                   <td className="hidden px-4 py-3 text-gray-600 md:table-cell md:px-6">{p.doctorName || '—'}</td>
                   <td className="px-4 py-3 sm:px-6">
-                    <Badge variant={statusBadge[p.status]}>{statusLabel[p.status]}</Badge>
+                    <Badge variant={statusBadge[p.status || 'ACTIF']}>{statusLabel[p.status || 'ACTIF']}</Badge>
                   </td>
                   <td className="px-4 py-3 text-right sm:px-6">
                     <Link href={`/dashboard/patients/${p.id}`} className="text-sm font-medium text-blue-700 hover:text-blue-900">

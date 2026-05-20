@@ -13,7 +13,7 @@ import type { Patient, Interaction } from '@/types'
 const interactions: Interaction[] = [
   { id: '1', patientId: '', type: 'NOTE', content: 'Patient suivi pour hypertension. TA bien controlée sous traitement actuel.', createdAt: '2025-05-18T10:30:00Z' },
   { id: '2', patientId: '', type: 'CALL', content: 'Rappel RDV demain à 14h00. Confirmé par téléphone.', createdAt: '2025-05-17T09:15:00Z' },
-  { id: '3', patientId: '', type: 'MESSAGE', content: 'Résultats d\'analyse envoyés par email.', createdAt: '2025-05-15T14:00:00Z' },
+  { id: '3', patientId: '', type: 'MESSAGE', content: "Résultats d'analyse envoyés par email.", createdAt: '2025-05-15T14:00:00Z' },
 ]
 
 const typeIcon: Record<string, React.ReactNode> = {
@@ -44,8 +44,10 @@ export default function PatientDetailPage() {
     })
   }, [id, getPatient])
 
-  async function handleEdit(data: Partial<Patient>) {
-    const updated = await updatePatient(id, data)
+  async function handleEdit(data: { firstName: string; lastName: string; phone: string; email: string; birthDate: string; address: string }) {
+    const { error } = await updatePatient(id, data)
+    if (error) return error
+    const updated = await getPatient(id)
     if (updated) setPatient(updated)
   }
 
@@ -60,7 +62,7 @@ export default function PatientDetailPage() {
 
   if (!patient) {
     return (
-      <div className="text-center py-20">
+      <div className="py-20 text-center">
         <p className="text-gray-500">Patient introuvable</p>
         <Button variant="secondary" className="mt-4" onClick={() => router.push('/dashboard/patients')}>
           Retour à la liste
@@ -68,6 +70,8 @@ export default function PatientDetailPage() {
       </div>
     )
   }
+
+  const fullName = `${patient.firstName} ${patient.lastName}`
 
   return (
     <div className="space-y-6">
@@ -78,11 +82,11 @@ export default function PatientDetailPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-700">
-            {patient.name.charAt(0)}
+            {patient.firstName.charAt(0)}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{patient.name}</h1>
-            <Badge variant={statusVariant[patient.status]}>
+            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+            <Badge variant={statusVariant[patient.status || 'ACTIF']}>
               {patient.status === 'ACTIF' ? 'Actif' : patient.status === 'PENDING' ? 'En attente' : 'No-show'}
             </Badge>
           </div>
@@ -147,7 +151,19 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      <PatientModal open={editOpen} onClose={() => setEditOpen(false)} onSave={handleEdit} patient={patient} />
+      <PatientModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleEdit}
+        initial={{
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          email: patient.email || '',
+          phone: patient.phone,
+          birthDate: patient.birthDate || '',
+          address: patient.address || '',
+        }}
+      />
 
       <Modal
         open={deleteOpen}
@@ -161,7 +177,7 @@ export default function PatientDetailPage() {
         }
       >
         <p className="text-sm text-gray-600">
-          Êtes-vous sûr de vouloir supprimer <strong>{patient.name}</strong> ? Cette action est irréversible.
+          Êtes-vous sûr de vouloir supprimer <strong>{fullName}</strong> ? Cette action est irréversible.
         </p>
       </Modal>
     </div>

@@ -7,17 +7,22 @@ export interface User {
 
 export interface Patient {
   id: string
-  name: string
+  firstName: string
+  lastName: string
   phone: string
-  email?: string
-  birthDate?: string
-  address?: string
-  doctorId: string
+  email?: string | null
+  birthDate?: string | null
+  address?: string | null
+  doctorId?: string
   doctorName?: string
-  status: 'ACTIF' | 'PENDING' | 'NO_SHOW'
-  lastAppointment?: string
+  tags?: string[]
+  status?: string
+  lastAppointment?: string | null
+  portalToken?: string | null
+  portalTokenExpiry?: string | null
   createdAt: string
   updatedAt: string
+  deletedAt?: string | null
 }
 
 export interface Appointment {

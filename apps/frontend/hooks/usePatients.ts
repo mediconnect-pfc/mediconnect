@@ -5,6 +5,8 @@ import type { Patient, PaginatedResponse } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('token')
   return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }
@@ -46,31 +48,37 @@ export function usePatients() {
     }
   }, [])
 
-  const createPatient = useCallback(async (data: Partial<Patient>): Promise<Patient | null> => {
+  const createPatient = useCallback(async (data: Record<string, JsonValue>): Promise<{ patient?: Patient; error?: string }> => {
     try {
       const res = await fetch(`${API_URL}/patients`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(data),
       })
-      if (!res.ok) return null
-      return await res.json()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        return { error: body.message || JSON.stringify(body) || 'Erreur création patient' }
+      }
+      return { patient: await res.json() }
     } catch {
-      return null
+      return { error: 'Erreur de connexion au serveur' }
     }
   }, [])
 
-  const updatePatient = useCallback(async (id: string, data: Partial<Patient>): Promise<Patient | null> => {
+  const updatePatient = useCallback(async (id: string, data: Record<string, JsonValue>): Promise<{ patient?: Patient; error?: string }> => {
     try {
       const res = await fetch(`${API_URL}/patients/${id}`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(data),
       })
-      if (!res.ok) return null
-      return await res.json()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        return { error: body.message || 'Erreur modification patient' }
+      }
+      return { patient: await res.json() }
     } catch {
-      return null
+      return { error: 'Erreur de connexion au serveur' }
     }
   }, [])
 
