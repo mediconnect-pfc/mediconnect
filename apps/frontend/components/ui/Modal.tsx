@@ -9,9 +9,10 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   actions?: React.ReactNode
+  className?: string
 }
 
-export default function Modal({ open, onClose, title, children, actions }: ModalProps) {
+export default function Modal({ open, onClose, title, children, actions, className = '' }: ModalProps) {
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden'
     else document.body.style.overflow = ''
@@ -22,7 +23,7 @@ export default function Modal({ open, onClose, title, children, actions }: Modal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl">
+      <div className={`flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl ${className}`}>
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
