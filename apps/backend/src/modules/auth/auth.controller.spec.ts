@@ -76,4 +76,37 @@ describe('AuthController', () => {
       );
     });
   });
+
+  describe('role-protected routes', () => {
+    it('adminOnly should return super admin message', () => {
+      const superAdmin: AuthenticatedUser = {
+        ...authenticatedUser,
+        role: 'SUPER_ADMIN',
+        establishmentId: null,
+      };
+
+      expect(controller.adminOnly(superAdmin)).toEqual({
+        message: `Bienvenue ${superAdmin.name} — accès Super Admin !`,
+      });
+    });
+
+    it('staffOnly should return staff message', () => {
+      expect(controller.staffOnly(authenticatedUser)).toEqual({
+        message: `Bienvenue ${authenticatedUser.name} — accès Staff !`,
+      });
+    });
+
+    it('clinicalOnly should return clinical message for DOCTOR', () => {
+      const doctor: AuthenticatedUser = {
+        ...authenticatedUser,
+        role: 'DOCTOR',
+        email: 'benali@alshifa.ma',
+        name: 'Dr. Benali',
+      };
+
+      expect(controller.clinicalOnly(doctor)).toEqual({
+        message: `Bienvenue ${doctor.name} — accès clinique !`,
+      });
+    });
+  });
 });
