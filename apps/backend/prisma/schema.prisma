@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────
+
+enum EstablishmentType {
+  CLINIC
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+enum EstablishmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN_CLINIQUE
+  MEDECIN
+  RECEPTIONNISTE
+  CAISSIER
+  PATIENT
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// ─── MODELS ──────────────────────────────────────────
+
+model Establishment {
+  id        String              @id @default(uuid())
+  name      String
+  type      EstablishmentType
+  plan      Plan                @default(FREE)
+  phone     String
+  address   String
+  status    EstablishmentStatus @default(ACTIVE)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  patients     Patient[]
+  appointments Appointment[]
+
+  @@map("establishments")
+}
+
+model Patient {
+  id              String   @id @default(uuid())
+  firstName       String
+  lastName        String
+  phone           String   @unique
+  email           String?
+  establishmentId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id])
+  appointments  Appointment[]
+  smsLogs       SmsLog[]
+
+  @@map("patients")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  establishmentId String
+  doctorName      String
+  date            DateTime
+  status          AppointmentStatus @default(PENDING)
+  portalToken     String?           @unique
+  tokenExpiresAt  DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  establishment Establishment @relation(fields: [establishmentId], references: [id])
+
+  @@map("appointments")
+}
+
+model SmsLog {
+  id        String   @id @default(uuid())
+  patientId String
+  message   String
+  sentAt    DateTime @default(now())
+  type      String
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@map("sms_logs")
+}
