@@ -50,7 +50,7 @@ export default function PatientsPage() {
     fetchPatients(page, search, status)
   }, [page, fetchPatients, search, status])
 
-  async function handleCreate(data: { firstName: string; lastName: string; phone: string; email: string; birthDate: string; address: string }) {
+  async function handleCreate(data: { firstName: string; lastName: string; phone: string; email: string; birthDate: string; address: string; status?: string }) {
     const { error } = await createPatient(data)
     if (error) return error
     fetchPatients(page, search, status)
