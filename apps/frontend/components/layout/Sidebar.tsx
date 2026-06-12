@@ -1,26 +1,29 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
-  CalendarCheck,
-  Megaphone,
-  BarChart3,
-  Settings,
+  Building2,
+  Calendar,
+  CreditCard,
+  Bot,
   LogOut,
+  HelpCircle,
+  Plus,
   X,
 } from 'lucide-react'
 import type { User } from '@/types'
 
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Patients', href: '/dashboard/patients', icon: Users },
-  { label: 'RDV', href: '/dashboard/rdv', icon: CalendarCheck },
-  { label: 'Campagnes', href: '/dashboard/campagnes', icon: Megaphone },
-  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { label: 'Dashboard',     href: '/dashboard',                  icon: LayoutDashboard },
+  { label: 'Patients',      href: '/dashboard/patients',         icon: Users },
+  { label: 'Clinics',       href: '/dashboard/clinics',          icon: Building2 },
+  { label: 'Appointments',  href: '/dashboard/appointments',     icon: Calendar },
+  { label: 'Financials',    href: '/dashboard/financials',       icon: CreditCard },
+  { label: 'IA Monitoring', href: '/dashboard/ia-monitoring',    icon: Bot },
 ]
 
 interface SidebarProps {
@@ -30,70 +33,101 @@ interface SidebarProps {
   onClose: () => void
 }
 
-export default function Sidebar({ user, onLogout, open, onClose }: SidebarProps) {
+function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>) {
   const pathname = usePathname()
 
   return (
+    <div className="flex h-full w-64 flex-col bg-[#0f1f3d]">
+      {/* Logo */}
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
+            <span className="text-base font-bold text-white">M</span>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white">MediConnect</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Clinical Portal</div>
+          </div>
+        </div>
+        <button onClick={onClose} className="text-white/40 hover:text-white lg:hidden">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+          return (
+            <Link key={href} href={href} onClick={onClose}>
+              <div className={`mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
+                active
+                  ? 'bg-blue-600/80 font-medium text-white'
+                  : 'text-white/60 hover:bg-white/8 hover:text-white'
+              }`}>
+                <Icon size={18} />
+                {label}
+              </div>
+            </Link>
+          )
+        })}
+
+        <div className="mt-4">
+          <button className="flex w-full items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700">
+            <Plus size={16} /> Nouvelle consultation
+          </button>
+        </div>
+      </nav>
+
+      {/* Footer */}
+      <div className="border-t border-white/10 px-3 py-3">
+        <Link href="/dashboard/help">
+          <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/50 hover:text-white/80">
+            <HelpCircle size={16} /> Centre d&apos;aide
+          </div>
+        </Link>
+        <button
+          onClick={onLogout}
+          className="mb-3 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/50 hover:text-red-400"
+        >
+          <LogOut size={16} /> Déconnexion
+        </button>
+
+        <div className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium text-white">{user.name}</div>
+            <div className="truncate text-xs text-white/40">{user.role}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function Sidebar({ user, onLogout, open, onClose }: SidebarProps) {
+  return (
     <>
+      {/* Desktop */}
+      <aside className="fixed left-0 top-0 z-30 hidden h-full lg:block">
+        <SidebarContent user={user} onLogout={onLogout} onClose={onClose} />
+      </aside>
+
+      {/* Mobile overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      <aside
-        className={`fixed left-0 top-0 z-30 flex h-full w-64 flex-col bg-white shadow-lg transition-transform duration-300 lg:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between border-b px-6 py-5">
-          <h1 className="text-xl font-bold text-blue-700">MediConnect</h1>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 lg:hidden">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const active = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  active
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                <Icon size={20} />
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="border-t px-4 py-4">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900">{user.name}</p>
-              <p className="truncate text-xs text-gray-500">{user.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-          >
-            <LogOut size={20} />
-            Déconnexion
-          </button>
-        </div>
+      {/* Mobile sidebar */}
+      <aside className={`fixed left-0 top-0 z-30 h-full transition-transform duration-300 lg:hidden ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <SidebarContent user={user} onLogout={onLogout} onClose={onClose} />
       </aside>
     </>
   )
