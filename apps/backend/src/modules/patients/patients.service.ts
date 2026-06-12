@@ -74,6 +74,7 @@ export class PatientsService {
     birthDate?: string | null;
     address?: string | null;
     tags?: string[];
+    status?: string;
     establishmentId: string;
   }) {
     const patient = await this.prisma.patient.create({
@@ -85,6 +86,7 @@ export class PatientsService {
         birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
         address: data.address ?? undefined,
         tags: data.tags ?? [],
+        status: (data.status as any) || 'ACTIF',
         establishmentId: data.establishmentId,
         portalToken: crypto.randomUUID(),
         portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
@@ -170,7 +172,7 @@ export class PatientsService {
 
   async import(
     establishmentId: string,
-    rows: { firstName: string; lastName: string; phone: string; birthDate?: string | null; tags?: string }[],
+    rows: { firstName: string; lastName: string; phone: string; birthDate?: string | null; tags?: string; status?: string }[],
   ) {
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
@@ -183,21 +185,27 @@ export class PatientsService {
           continue;
         }
 
+        if (!/^\d{10}$/.test(row.phone)) {
+          errors.push({ row: i + 1, message: 'Téléphone invalide (10 chiffres requis)' });
+          continue;
+        }
+
         const tags = row.tags
           ? row.tags.split(/[,|]/).map((t) => t.trim()).filter(Boolean)
           : [];
 
         await this.prisma.patient.create({
-          data: {
-            firstName: row.firstName,
-            lastName: row.lastName,
-            phone: row.phone,
-            birthDate: row.birthDate ? new Date(row.birthDate) : undefined,
-            tags,
-            establishmentId,
-            portalToken: crypto.randomUUID(),
-            portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          },
+      data: {
+        firstName: row.firstName,
+        lastName: row.lastName,
+        phone: row.phone,
+        birthDate: row.birthDate ? new Date(row.birthDate) : undefined,
+        tags,
+        status: (row.status as any) || 'ACTIF',
+        establishmentId,
+        portalToken: crypto.randomUUID(),
+        portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      },
         });
         imported++;
       } catch (err: any) {

@@ -98,6 +98,12 @@ enum MessageStatus {
   FAILED
 }
 
+enum PatientStatus {
+  ACTIF
+  PENDING
+  NO_SHOW
+}
+
 enum AnalyseStatus {
   PENDING
   IMPORTED
@@ -185,19 +191,20 @@ model User {
 // ══════════════════════════════════════════════
 
 model Patient {
-  id                String    @id @default(uuid())
+  id                String        @id @default(uuid())
   establishmentId   String
   firstName         String
   lastName          String
-  email             String?   @unique
+  email             String?       @unique
   phone             String
   birthDate         DateTime?
   address           String?
   tags              String[]
-  portalToken       String?   @unique
+  status            PatientStatus @default(PENDING)
+  portalToken       String?       @unique
   portalTokenExpiry DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
 
   establishment    Establishment     @relation(fields: [establishmentId], references: [id])

@@ -113,7 +113,7 @@ export class PatientsController {
 
     if (rows.length === 0) throw new BadRequestException('Fichier vide');
 
-    const knownHeaders = ['firstName', 'lastName', 'firstname', 'lastname', 'prénom', 'nom', 'phone', 'téléphone', 'email', 'birthdate', 'date', 'tags'];
+    const knownHeaders = ['firstName', 'lastName', 'firstname', 'lastname', 'prénom', 'nom', 'phone', 'téléphone', 'email', 'birthdate', 'date', 'tags', 'status'];
     const first = rows[0];
     const hasHeaders = first.some((h) => knownHeaders.includes(h.toLowerCase().trim()));
 
@@ -129,6 +129,7 @@ export class PatientsController {
             else if (h === 'email') obj.email = val;
             else if (h === 'birthdate' || h === 'date') obj.birthDate = val;
             else if (h === 'tags') obj.tags = val;
+            else if (h === 'status') obj.status = val?.toUpperCase();
           });
           return obj;
         })
@@ -138,6 +139,7 @@ export class PatientsController {
           phone: row[2] || '',
           birthDate: row[3] || null,
           tags: row[4] || '',
+          status: ((row[5] || '').toUpperCase() as 'ACTIF' | 'PENDING' | 'NO_SHOW') || 'ACTIF',
         }));
 
     return this.service.import(this.getEstId(req), records);

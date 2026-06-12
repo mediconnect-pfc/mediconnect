@@ -12,6 +12,7 @@ interface PatientFormData {
   phone: string
   birthDate: string
   address: string
+  status: string
 }
 
 interface PatientModalProps {
@@ -21,6 +22,12 @@ interface PatientModalProps {
   initial?: Partial<PatientFormData>
 }
 
+const statusOptions = [
+  { value: 'ACTIF', label: 'Actif' },
+  { value: 'PENDING', label: 'En attente' },
+  { value: 'NO_SHOW', label: 'No-show' },
+]
+
 export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
   const [form, setForm] = useState<PatientFormData>({
     firstName: initial?.firstName || '',
@@ -29,31 +36,43 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
     phone: initial?.phone || '',
     birthDate: initial?.birthDate || '',
     address: initial?.address || '',
+    status: initial?.status || 'ACTIF',
   })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  function validate(): boolean {
+    const errs: Record<string, string> = {}
+    if (!form.firstName) errs.firstName = 'Requis'
+    if (!form.lastName) errs.lastName = 'Requis'
+    if (!form.phone) errs.phone = 'Requis'
+    else if (!/^\d{10}$/.test(form.phone)) errs.phone = '10 chiffres requis'
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.firstName || !form.lastName || !form.phone) {
-      setError('Prénom, nom et téléphone sont requis')
-      return
-    }
+    if (!validate()) return
     setSaving(true)
-    setError('')
     try {
       const err = await onSave(form)
       if (err) {
-        setError(err)
+        setErrors({ general: err })
         setSaving(false)
         return
       }
       onClose()
     } catch {
-      setError('Erreur lors de la sauvegarde')
+      setErrors({ general: 'Erreur lors de la sauvegarde' })
     } finally {
       setSaving(false)
     }
+  }
+
+  function set<K extends keyof PatientFormData>(field: K, value: PatientFormData[K]) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+    setErrors((prev) => ({ ...prev, [field]: '' }))
   }
 
   return (
@@ -76,15 +95,15 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
             id="firstName"
             label="Prénom"
             value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-            error={error && !form.firstName ? 'Requis' : undefined}
+            onChange={(e) => set('firstName', e.target.value)}
+            error={errors.firstName}
           />
           <Input
             id="lastName"
             label="Nom"
             value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-            error={error && !form.lastName ? 'Requis' : undefined}
+            onChange={(e) => set('lastName', e.target.value)}
+            error={errors.lastName}
           />
         </div>
         <Input
@@ -92,29 +111,42 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
           label="Email"
           type="email"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={(e) => set('email', e.target.value)}
         />
         <Input
           id="phone"
-          label="Téléphone"
+          label="Téléphone (10 chiffres)"
           value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          error={error && !form.phone ? 'Requis' : undefined}
+          onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+          error={errors.phone}
         />
         <Input
           id="birthDate"
           label="Date de naissance"
           type="date"
           value={form.birthDate}
-          onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+          onChange={(e) => set('birthDate', e.target.value)}
         />
         <Input
           id="address"
           label="Adresse"
           value={form.address}
-          onChange={(e) => setForm({ ...form, address: e.target.value })}
+          onChange={(e) => set('address', e.target.value)}
         />
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        <div>
+          <label htmlFor="status" className="block text-sm font-medium text-gray-700">Statut</label>
+          <select
+            id="status"
+            value={form.status}
+            onChange={(e) => set('status', e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        {errors.general && <p className="text-sm text-red-500">{errors.general}</p>}
       </form>
     </Modal>
   )
