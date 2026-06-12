@@ -2,24 +2,28 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Pencil, Trash2, Phone, Mail, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Phone, Mail, Calendar, MapPin, PhoneCall, MessageSquare } from 'lucide-react'
 import { usePatients } from '@/hooks/usePatients'
 import PatientModal from '@/components/patients/PatientModal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import type { Patient, Interaction } from '@/types'
-
-const interactions: Interaction[] = [
-  { id: '1', patientId: '', type: 'NOTE', content: 'Patient suivi pour hypertension. TA bien controlée sous traitement actuel.', createdAt: '2025-05-18T10:30:00Z' },
-  { id: '2', patientId: '', type: 'CALL', content: 'Rappel RDV demain à 14h00. Confirmé par téléphone.', createdAt: '2025-05-17T09:15:00Z' },
-  { id: '3', patientId: '', type: 'MESSAGE', content: "Résultats d'analyse envoyés par email.", createdAt: '2025-05-15T14:00:00Z' },
-]
+import type { Patient } from '@/types'
 
 const typeIcon: Record<string, React.ReactNode> = {
-  NOTE: <Pencil size={16} />,
-  CALL: <Phone size={16} />,
-  MESSAGE: <Mail size={16} />,
+  CALL: <PhoneCall size={16} />,
+  SMS: <MessageSquare size={16} />,
+}
+
+const typeLabel: Record<string, string> = {
+  CALL: 'Appel',
+  SMS: 'SMS',
+}
+
+const sentimentBadge: Record<string, string> = {
+  POSITIVE: 'text-green-600',
+  NEUTRAL: 'text-gray-500',
+  NEGATIVE: 'text-red-500',
 }
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
@@ -128,26 +132,45 @@ export default function PatientDetailPage() {
 
         <div className="rounded-xl border bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Dernières interactions</h2>
-          <div className="space-y-3">
-            {interactions.map((item) => (
-              <div key={item.id} className="flex gap-3 rounded-lg border p-4">
-                <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500">
-                  {typeIcon[item.type]}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-500">
-                      {item.type === 'NOTE' ? 'Note' : item.type === 'CALL' ? 'Appel' : 'Message'}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(item.createdAt).toLocaleDateString('fr-FR')}
-                    </span>
+          {!patient.interactions || patient.interactions.length === 0 ? (
+            <p className="text-sm text-gray-400">Aucune interaction enregistrée.</p>
+          ) : (
+            <div className="space-y-3">
+              {patient.interactions.map((item) => (
+                <div key={item.id} className="flex gap-3 rounded-lg border p-4">
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                    {typeIcon[item.type] ?? <Phone size={16} />}
                   </div>
-                  <p className="mt-1 text-sm text-gray-700">{item.content}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500">
+                          {typeLabel[item.type] ?? item.type}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {item.direction === 'INBOUND' ? '↙ Entrant' : '↗ Sortant'}
+                        </span>
+                        {item.sentiment && (
+                          <span className={`text-xs font-medium ${sentimentBadge[item.sentiment]}`}>
+                            {item.sentiment === 'POSITIVE' ? '😊' : item.sentiment === 'NEGATIVE' ? '😞' : '😐'}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {new Date(item.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    {item.transcript && (
+                      <p className="mt-1 text-sm text-gray-700">{item.transcript}</p>
+                    )}
+                    {item.duration != null && (
+                      <p className="mt-0.5 text-xs text-gray-400">{item.duration}s</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

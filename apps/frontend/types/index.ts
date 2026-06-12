@@ -5,6 +5,28 @@ export interface User {
   role: string
 }
 
+export interface Appointment {
+  id: string
+  patientId: string
+  doctorId: string
+  slot: string
+  status: 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+  confirmation: 'PENDING' | 'CONFIRMED' | 'CANCELLED'
+  notes?: string | null
+}
+
+export interface Interaction {
+  id: string
+  patientId: string
+  type: 'CALL' | 'SMS'
+  direction: 'INBOUND' | 'OUTBOUND'
+  transcript?: string | null
+  sentiment?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE' | null
+  intent?: string | null
+  duration?: number | null
+  createdAt: string
+}
+
 export interface Patient {
   id: string
   firstName: string
@@ -23,23 +45,8 @@ export interface Patient {
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
-}
-
-export interface Appointment {
-  id: string
-  patientId: string
-  doctorId: string
-  date: string
-  motif: string
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
-}
-
-export interface Interaction {
-  id: string
-  patientId: string
-  type: 'CALL' | 'MESSAGE' | 'NOTE'
-  content: string
-  createdAt: string
+  interactions?: Interaction[]
+  appointments?: Appointment[]
 }
 
 export interface PaginatedResponse<T> {
