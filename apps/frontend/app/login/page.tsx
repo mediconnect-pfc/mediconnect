@@ -50,32 +50,36 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-xl">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-blue-800">MediConnect</h1>
-          <p className="mt-2 text-gray-500">Connectez-vous à votre espace</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#0f1f3d] px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-10 shadow-2xl">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0f1f3d]">
+            <span className="text-lg font-bold text-white">M</span>
+          </div>
+          <h1 className="text-xl font-bold text-[#0f1f3d]">MediConnect</h1>
+          <p className="mt-1 text-sm text-gray-400">Connexion à votre espace</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-600">Email</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={() => setTouched((p) => ({ ...p, email: true }))}
-              placeholder="vous@exemple.com"
-              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:ring-2 ${
-                emailError ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+              placeholder="votre@email.com"
+              className={`mt-1.5 block w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:ring-2 ${
+                emailError ? 'border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
               }`}
             />
             {emailError && <p className="mt-1 text-xs text-red-500">Email invalide</p>}
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Mot de passe</label>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-600">Mot de passe</label>
             <input
               id="password"
               type="password"
@@ -83,8 +87,8 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               onBlur={() => setTouched((p) => ({ ...p, password: true }))}
               placeholder="••••••••"
-              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:ring-2 ${
-                passwordError ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+              className={`mt-1.5 block w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition focus:ring-2 ${
+                passwordError ? 'border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
               }`}
             />
             {passwordError && <p className="mt-1 text-xs text-red-500">Minimum 6 caractères</p>}
@@ -95,7 +99,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center rounded-lg bg-[#0f1f3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#162d57] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -106,11 +110,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="flex flex-col items-center gap-2 text-sm">
-          <Link href="/forgot-password" className="text-blue-600 hover:text-blue-800 hover:underline">Mot de passe oublié ?</Link>
-          <p className="text-gray-500">
+        <div className="mt-6 flex flex-col items-center gap-2 text-sm">
+          <Link href="/forgot-password" className="text-blue-600 hover:underline">Mot de passe oublié ?</Link>
+          <p className="text-gray-400">
             Pas encore de compte ?{' '}
-            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-800 hover:underline">Créer un compte</Link>
+            <Link href="/register" className="font-medium text-blue-600 hover:underline">Créer un compte</Link>
           </p>
         </div>
       </div>
