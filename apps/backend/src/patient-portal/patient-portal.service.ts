@@ -47,7 +47,7 @@ export class PatientPortalService {
           orderBy: { slot: 'asc' },
         },
         interactions: {
-          where: { type: 'SMS' },
+          where: { type: { in: ['SMS', 'CALL'] } },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -85,7 +85,7 @@ export class PatientPortalService {
       })),
       smsHistory: patient.interactions.map((i) => ({
         id: i.id,
-        message: i.transcript ?? '',
+        message: i.transcript ?? (i.type === 'CALL' ? 'Appel reçu' : 'Message SMS'),
         sentAt: i.createdAt,
         type: i.type,
       })),
