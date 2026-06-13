@@ -1,87 +1,153 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PatientPortalService } from '../patient-portal/patient-portal.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { FilterAppointmentDto } from './dto/filter-appointment.dto';
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus, Prisma, UserRole } from '@prisma/client';
+import { AppointmentsGateway } from './appointments.gateway';
 
 @Injectable()
 export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly patientPortalService: PatientPortalService,
+    private readonly appointmentsGateway: AppointmentsGateway,
   ) {}
 
-  async findTodayAppointments(filters: FilterAppointmentDto) {
+  async getOptions(establishmentId: string) {
+    const [patients, doctors] = await Promise.all([
+      this.prisma.patient.findMany({
+        where: { establishmentId, deletedAt: null },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        select: { id: true, firstName: true, lastName: true, phone: true },
+      }),
+      this.prisma.user.findMany({
+        where: { establishmentId, role: UserRole.DOCTOR, isActive: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    return { patients, doctors };
+  }
+
+  async findTodayAppointments(establishmentId: string, filters: FilterAppointmentDto) {
     const today = new Date();
     const startOfDay = new Date(today.setHours(0, 0, 0, 0));
     const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
-    const where: any = {};
+    const where: Prisma.AppointmentWhereInput = {
+      patient: { establishmentId, deletedAt: null },
+    };
 
     if (filters.date) {
-      where.date = {
+      where.slot = {
         gte: new Date(new Date(filters.date).setHours(0, 0, 0, 0)),
         lte: new Date(new Date(filters.date).setHours(23, 59, 59, 999)),
       };
     } else {
-      where.date = { gte: startOfDay, lte: endOfDay };
+      where.slot = { gte: startOfDay, lte: endOfDay };
     }
 
-    if (filters.doctorName) where.doctorName = { contains: filters.doctorName, mode: 'insensitive' };
-    if (filters.establishmentId) where.establishmentId = filters.establishmentId;
+    if (filters.doctorId) where.doctorId = filters.doctorId;
 
-    return this.prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where,
-      include: { patient: true },
-      orderBy: { date: 'asc' },
+      include: { patient: true, doctor: { select: { id: true, name: true } } },
+      orderBy: { slot: 'asc' },
     });
+
+    return appointments.map((appointment) => this.toResponse(appointment));
   }
 
-  async create(dto: CreateAppointmentDto) {
-    const patient = await this.prisma.patient.findUnique({ where: { id: dto.patientId } });
+  async create(establishmentId: string, dto: CreateAppointmentDto) {
+    const patient = await this.prisma.patient.findFirst({
+      where: { id: dto.patientId, establishmentId, deletedAt: null },
+    });
     if (!patient) throw new NotFoundException('Patient introuvable');
+
+    const doctor = await this.prisma.user.findFirst({
+      where: {
+        id: dto.doctorId,
+        establishmentId,
+        role: UserRole.DOCTOR,
+        isActive: true,
+      },
+    });
+    if (!doctor) throw new NotFoundException('Médecin introuvable');
+
+    const slot = new Date(`${dto.date}T${dto.time}`);
+    if (Number.isNaN(slot.getTime())) {
+      throw new BadRequestException('Date ou heure invalide');
+    }
 
     const appointment = await this.prisma.appointment.create({
       data: {
         patientId: dto.patientId,
-        establishmentId: dto.establishmentId,
-        doctorName: dto.doctorName,
-        date: new Date(dto.date),
+        doctorId: dto.doctorId,
+        slot,
       },
-      include: { patient: true },
+      include: { patient: true, doctor: { select: { id: true, name: true } } },
     });
 
     const token = await this.patientPortalService.generatePortalToken(appointment.id);
     const portalLink = `https://mediconnect.ma/patient?token=${token}`;
 
-    return { ...appointment, portalLink };
+    this.appointmentsGateway.emitUpdated(establishmentId);
+
+    return { ...this.toResponse(appointment), portalLink };
   }
 
-  async confirm(id: string) {
-    await this.findOne(id);
-    return this.prisma.appointment.update({
+  async confirm(establishmentId: string, id: string) {
+    await this.findOne(establishmentId, id);
+    const appointment = await this.prisma.appointment.update({
       where: { id },
       data: { status: AppointmentStatus.CONFIRMED },
-      include: { patient: true },
+      include: { patient: true, doctor: { select: { id: true, name: true } } },
     });
+    this.appointmentsGateway.emitUpdated(establishmentId);
+    return this.toResponse(appointment);
   }
 
-  async cancel(id: string) {
-    await this.findOne(id);
-    return this.prisma.appointment.update({
+  async cancel(establishmentId: string, id: string) {
+    await this.findOne(establishmentId, id);
+    const appointment = await this.prisma.appointment.update({
       where: { id },
       data: { status: AppointmentStatus.CANCELLED },
-      include: { patient: true },
+      include: { patient: true, doctor: { select: { id: true, name: true } } },
     });
+    this.appointmentsGateway.emitUpdated(establishmentId);
+    return this.toResponse(appointment);
   }
 
-  async findOne(id: string) {
+  async findOne(establishmentId: string, id: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { patient: true },
+      include: { patient: true, doctor: { select: { id: true, name: true } } },
     });
-    if (!appointment) throw new NotFoundException(`RDV #${id} introuvable`);
+    if (!appointment || appointment.patient.establishmentId !== establishmentId) {
+      throw new NotFoundException(`RDV #${id} introuvable`);
+    }
     return appointment;
+  }
+
+  private toResponse(
+    appointment: Prisma.AppointmentGetPayload<{
+      include: { patient: true; doctor: { select: { id: true; name: true } } };
+    }>,
+  ) {
+    return {
+      id: appointment.id,
+      doctorId: appointment.doctorId,
+      doctorName: appointment.doctor.name,
+      date: appointment.slot,
+      status: appointment.status,
+      patient: {
+        id: appointment.patient.id,
+        firstName: appointment.patient.firstName,
+        lastName: appointment.patient.lastName,
+        phone: appointment.patient.phone,
+      },
+    };
   }
 }
