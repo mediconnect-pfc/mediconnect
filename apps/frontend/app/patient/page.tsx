@@ -1,177 +1,177 @@
-'use client';
+'use client'
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Calendar, Phone, Check, X, Clock, MessageSquare, AlertCircle } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Calendar, Phone, Check, X, Clock, MessageSquare, AlertCircle } from 'lucide-react'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 interface PortalData {
-  patient: { id: string; firstName: string; lastName: string; phone: string };
-  nextAppointment: { id: string; doctorName: string; date: string; status: string } | null;
-  appointments: { id: string; doctorName: string; date: string; status: string }[];
-  smsHistory: { id: string; message: string; sentAt: string; type: string }[];
+  patient: { id: string; firstName: string; lastName: string; phone: string }
+  nextAppointment: { id: string; doctorName: string; date: string; status: string } | null
+  appointments: { id: string; doctorName: string; date: string; status: string }[]
+  smsHistory: { id: string; message: string; sentAt: string; type: string }[]
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  SCHEDULED: { label: 'En attente', color: '#d97706', bg: '#fef3c7' },
   CONFIRMED: { label: 'Confirmé', color: '#16a34a', bg: '#dcfce7' },
-  PENDING:   { label: 'En attente', color: '#d97706', bg: '#fef3c7' },
   CANCELLED: { label: 'Annulé', color: '#dc2626', bg: '#fee2e2' },
   COMPLETED: { label: 'Terminé', color: '#0891b2', bg: '#e0f2fe' },
-};
+  NO_SHOW: { label: 'No-show', color: '#64748b', bg: '#f1f5f9' },
+}
+
+async function parseError(res: Response, fallback: string) {
+  try {
+    const body = await res.json()
+    if (typeof body.message === 'string') return body.message
+    if (Array.isArray(body.message)) return body.message.join(', ')
+  } catch {
+    // ignore
+  }
+  return fallback
+}
 
 function PatientPortalContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const searchParams = useSearchParams()
+  const token = searchParams.get('token')
 
-  const [data, setData] = useState<PortalData | null>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [actionMsg, setActionMsg] = useState('');
+  const [data, setData] = useState<PortalData | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [actionMsg, setActionMsg] = useState('')
+
+  const fetchPortalData = async () => {
+    if (!token) {
+      setError('Token manquant ou invalide.')
+      setLoading(false)
+      return
+    }
+
+    const res = await fetch(`${API_URL}/patient/portal?token=${encodeURIComponent(token)}`)
+    if (!res.ok) {
+      throw new Error(await parseError(res, 'Token invalide ou expiré'))
+    }
+    return res.json() as Promise<PortalData>
+  }
 
   useEffect(() => {
-    if (!token) { setError('Token manquant ou invalide.'); setLoading(false); return; }
-    fetch(`http://localhost:3000/api/patient/portal?token=${token}`)
-      .then(r => { if (!r.ok) throw new Error('Token invalide ou expiré'); return r.json(); })
-      .then(setData)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [token]);
+    fetchPortalData()
+      .then((portalData) => {
+        if (portalData) setData(portalData)
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Token invalide ou expiré'))
+      .finally(() => setLoading(false))
+  }, [token])
 
   const handleAction = async (id: string, action: 'confirm' | 'cancel') => {
+    if (!token) return
+
     try {
       const res = await fetch(
-        `http://localhost:3000/api/patient/portal/rdv/${id}/${action}?token=${token}`,
-        { method: 'PATCH' }
-      );
-      if (!res.ok) throw new Error('Erreur');
-      setActionMsg(action === 'confirm' ? '✅ RDV confirmé !' : '❌ RDV annulé.');
-      // Rafraîchir les données
-      const updated = await fetch(`http://localhost:3000/api/patient/portal?token=${token}`).then(r => r.json());
-      setData(updated);
-      setTimeout(() => setActionMsg(''), 3000);
+        `${API_URL}/patient/portal/rdv/${id}/${action}?token=${encodeURIComponent(token)}`,
+        { method: 'PATCH' },
+      )
+      if (!res.ok) throw new Error(await parseError(res, 'Erreur'))
+
+      setActionMsg(action === 'confirm' ? 'RDV confirmé.' : 'RDV annulé.')
+      const updated = await fetchPortalData()
+      if (updated) setData(updated)
+      setTimeout(() => setActionMsg(''), 3000)
     } catch {
-      setActionMsg('Une erreur est survenue.');
+      setActionMsg('Une erreur est survenue.')
     }
-  };
+  }
 
-  // Loading
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 40, height: 40, border: '3px solid var(--mc-blue)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ color: 'var(--mc-gray-400)', fontSize: 14 }}>Chargement...</p>
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <p className="text-sm text-gray-500">Chargement...</p>
+        </div>
       </div>
-    </div>
-  );
+    )
+  }
 
-  // Erreur token
-  if (error) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ textAlign: 'center', maxWidth: 320 }}>
-        <AlertCircle size={48} color="#dc2626" style={{ margin: '0 auto 16px' }} />
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--mc-gray-800)', marginBottom: 8 }}>
-          Accès impossible
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--mc-gray-400)' }}>{error}</p>
-        <p style={{ fontSize: 12, color: 'var(--mc-gray-400)', marginTop: 8 }}>
-          Ce lien est peut-être expiré ou invalide. Contactez votre clinique.
-        </p>
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
+        <div className="max-w-sm text-center">
+          <AlertCircle size={48} className="mx-auto mb-4 text-red-600" />
+          <h2 className="mb-2 text-lg font-bold text-gray-900">Accès impossible</h2>
+          <p className="text-sm text-gray-500">{error}</p>
+          <p className="mt-2 text-xs text-gray-400">
+            Ce lien est peut-être expiré ou invalide. Contactez votre clinique.
+          </p>
+        </div>
       </div>
-    </div>
-  );
+    )
+  }
 
-  const { patient, nextAppointment, appointments, smsHistory } = data!;
+  const { patient, nextAppointment, appointments, smsHistory } = data!
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--mc-gray-50)' }}>
-      {/* Header simple — pas de sidebar */}
-      <div style={{
-        background: 'var(--mc-navy)', padding: '16px 20px',
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <div style={{
-          width: 32, height: 32, background: 'var(--mc-blue)',
-          borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ color: 'white', fontWeight: 700 }}>M</span>
+    <div className="min-h-screen bg-gray-50">
+      <div className="flex items-center gap-3 bg-[#0f1f3d] px-5 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+          <span className="font-bold text-white">M</span>
         </div>
-        <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>MediConnect</span>
+        <span className="text-base font-semibold text-white">MediConnect</span>
       </div>
 
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px' }}>
-
-        {/* Message d'action */}
+      <div className="mx-auto max-w-md px-4 py-5">
         {actionMsg && (
-          <div style={{
-            background: 'white', border: '1px solid var(--mc-gray-200)',
-            borderRadius: 10, padding: '12px 16px', marginBottom: 16,
-            textAlign: 'center', fontSize: 14, fontWeight: 500,
-          }}>
+          <div className="mb-4 rounded-lg border bg-white px-4 py-3 text-center text-sm font-medium text-gray-800">
             {actionMsg}
           </div>
         )}
 
-        {/* Bonjour patient */}
-        <div style={{
-          background: 'var(--mc-navy)', borderRadius: 14,
-          padding: '20px', marginBottom: 16, color: 'white',
-        }}>
-          <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 4 }}>Bonjour,</p>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>
+        <div className="mb-4 rounded-2xl bg-[#0f1f3d] p-5 text-white">
+          <p className="mb-1 text-sm opacity-70">Bonjour,</p>
+          <h1 className="text-2xl font-bold">
             {patient.firstName} {patient.lastName}
           </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, opacity: 0.7 }}>
-            <Phone size={13} />
-            <span style={{ fontSize: 13 }}>{patient.phone}</span>
+          <div className="mt-2 flex items-center gap-2 text-sm opacity-70">
+            <Phone size={14} />
+            <span>{patient.phone}</span>
           </div>
         </div>
 
-        {/* Prochain RDV */}
         {nextAppointment ? (
-          <div style={{
-            background: 'white', borderRadius: 14,
-            border: '1px solid var(--mc-gray-200)', padding: 20, marginBottom: 16,
-          }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--mc-gray-400)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Prochain Rendez-vous
+          <div className="mb-4 rounded-2xl border bg-white p-5">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Prochain rendez-vous
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <div style={{
-                width: 44, height: 44, background: 'var(--mc-gray-100)',
-                borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Calendar size={20} color="var(--mc-blue)" />
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100">
+                <Calendar size={20} className="text-blue-600" />
               </div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--mc-gray-800)' }}>
-                  {nextAppointment.doctorName}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--mc-gray-400)', marginTop: 2 }}>
+                <div className="font-semibold text-gray-900">{nextAppointment.doctorName}</div>
+                <div className="mt-1 text-sm text-gray-500">
                   {new Date(nextAppointment.date).toLocaleDateString('fr-FR', {
-                    weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </div>
               </div>
             </div>
 
-            {nextAppointment.status === 'PENDING' && (
-              <div style={{ display: 'flex', gap: 10 }}>
+            {nextAppointment.status === 'SCHEDULED' && (
+              <div className="flex gap-3">
                 <button
                   onClick={() => handleAction(nextAppointment.id, 'confirm')}
-                  style={{
-                    flex: 1, padding: '11px', background: 'var(--mc-navy)', color: 'white',
-                    border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0f1f3d] px-4 py-3 text-sm font-semibold text-white"
                 >
                   <Check size={16} /> Confirmer mon RDV
                 </button>
                 <button
                   onClick={() => handleAction(nextAppointment.id, 'cancel')}
-                  style={{
-                    flex: 1, padding: '11px', background: '#fee2e2', color: '#dc2626',
-                    border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-100 px-4 py-3 text-sm font-semibold text-red-700"
                 >
                   <X size={16} /> Annuler
                 </button>
@@ -179,83 +179,86 @@ function PatientPortalContent() {
             )}
           </div>
         ) : (
-          <div style={{
-            background: 'white', borderRadius: 14, border: '1px solid var(--mc-gray-200)',
-            padding: 20, marginBottom: 16, textAlign: 'center',
-          }}>
-            <Clock size={28} color="var(--mc-gray-400)" style={{ margin: '0 auto 8px' }} />
-            <p style={{ fontSize: 14, color: 'var(--mc-gray-400)' }}>Aucun rendez-vous à venir</p>
+          <div className="mb-4 rounded-2xl border bg-white p-5 text-center">
+            <Clock size={28} className="mx-auto mb-2 text-gray-400" />
+            <p className="text-sm text-gray-500">Aucun rendez-vous à venir</p>
           </div>
         )}
 
-        {/* Historique des RDV */}
-        <div style={{
-          background: 'white', borderRadius: 14,
-          border: '1px solid var(--mc-gray-200)', padding: 20, marginBottom: 16,
-        }}>
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--mc-gray-400)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div className="mb-4 rounded-2xl border bg-white p-5">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
             Historique des RDV
           </h2>
           {appointments.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--mc-gray-400)', textAlign: 'center' }}>Aucun historique</p>
-          ) : appointments.map(apt => {
-            const s = STATUS_LABELS[apt.status] || STATUS_LABELS.PENDING;
-            return (
-              <div key={apt.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid var(--mc-gray-100)',
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--mc-gray-800)' }}>{apt.doctorName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--mc-gray-400)', marginTop: 2 }}>
-                    {new Date(apt.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+            <p className="text-center text-sm text-gray-400">Aucun historique</p>
+          ) : (
+            appointments.map((apt) => {
+              const status = STATUS_LABELS[apt.status] ?? STATUS_LABELS.SCHEDULED
+              return (
+                <div
+                  key={apt.id}
+                  className="mb-3 flex items-center justify-between border-b border-gray-100 pb-3 last:mb-0 last:border-b-0 last:pb-0"
+                >
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{apt.doctorName}</div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {new Date(apt.date).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </div>
                   </div>
+                  <span
+                    className="rounded-full px-2.5 py-1 text-xs font-medium"
+                    style={{ background: status.bg, color: status.color }}
+                  >
+                    {status.label}
+                  </span>
                 </div>
-                <span style={{
-                  fontSize: 11, fontWeight: 500, padding: '3px 8px',
-                  borderRadius: 99, background: s.bg, color: s.color,
-                }}>
-                  {s.label}
-                </span>
-              </div>
-            );
-          })}
+              )
+            })
+          )}
         </div>
 
-        {/* Historique SMS */}
         {smsHistory.length > 0 && (
-          <div style={{
-            background: 'white', borderRadius: 14,
-            border: '1px solid var(--mc-gray-200)', padding: 20,
-          }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--mc-gray-400)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Historique SMS & Appels
+          <div className="rounded-2xl border bg-white p-5">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Historique SMS &amp; appels
             </h2>
-            {smsHistory.map(sms => (
-              <div key={sms.id} style={{
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-                marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--mc-gray-100)',
-              }}>
-                <MessageSquare size={15} color="var(--mc-blue)" style={{ marginTop: 2, flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: 13, color: 'var(--mc-gray-800)' }}>{sms.message}</p>
-                  <p style={{ fontSize: 11, color: 'var(--mc-gray-400)', marginTop: 2 }}>
-                    {new Date(sms.sentAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+            {smsHistory.map((item) => {
+              const Icon = item.type === 'CALL' ? Phone : MessageSquare
+              return (
+                <div
+                  key={item.id}
+                  className="mb-3 flex gap-3 border-b border-gray-100 pb-3 last:mb-0 last:border-b-0 last:pb-0"
+                >
+                  <Icon size={15} className="mt-0.5 shrink-0 text-blue-600" />
+                  <div>
+                    <p className="text-sm text-gray-800">{item.message}</p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {new Date(item.sentAt).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
 
 export default function PatientPortalPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Chargement...</div>}>
+    <Suspense fallback={<div className="p-10 text-center text-sm text-gray-500">Chargement...</div>}>
       <PatientPortalContent />
     </Suspense>
-  );
+  )
 }
