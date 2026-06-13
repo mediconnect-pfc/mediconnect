@@ -224,16 +224,18 @@ model Patient {
 // ══════════════════════════════════════════════
 
 model Appointment {
-  id            String             @id @default(uuid())
-  patientId     String
-  doctorId      String
-  slot          DateTime
-  status        AppointmentStatus  @default(SCHEDULED)
-  confirmation  ConfirmationStatus @default(PENDING)
-  source        String             @default("manual")
-  notes         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id             String             @id @default(uuid())
+  patientId      String
+  doctorId       String
+  slot           DateTime
+  status         AppointmentStatus  @default(SCHEDULED)
+  confirmation   ConfirmationStatus @default(PENDING)
+  source         String             @default("manual")
+  notes          String?
+  portalToken    String?            @unique
+  tokenExpiresAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   patient       Patient        @relation(fields: [patientId], references: [id])
   doctor        User           @relation(fields: [doctorId], references: [id])
