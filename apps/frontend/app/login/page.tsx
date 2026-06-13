@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+import { API_URL } from '@/lib/api'
 
 function setCookie(token: string) {
   document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`
@@ -21,6 +20,12 @@ export default function LoginPage() {
   const emailError = touched.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const passwordError = touched.password && password.length < 6
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && password.length >= 6
+
+  useEffect(() => {
+    if (window.location.search.includes('expired=1')) {
+      setError('Votre session a expiré. Veuillez vous reconnecter.')
+    }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

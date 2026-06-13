@@ -21,6 +21,14 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   NO_SHOW: { label: 'No-show', color: '#64748b', bg: '#f1f5f9' },
 }
 
+function isUpcoming(date: string) {
+  return new Date(date) > new Date()
+}
+
+function canPatientAct(status: string, date: string) {
+  return status === 'SCHEDULED' && isUpcoming(date)
+}
+
 async function parseError(res: Response, fallback: string) {
   try {
     const body = await res.json()
@@ -161,7 +169,7 @@ function PatientPortalContent() {
               </div>
             </div>
 
-            {nextAppointment.status === 'SCHEDULED' && (
+            {canPatientAct(nextAppointment.status, nextAppointment.date) ? (
               <div className="flex gap-3">
                 <button
                   onClick={() => handleAction(nextAppointment.id, 'confirm')}
@@ -176,7 +184,11 @@ function PatientPortalContent() {
                   <X size={16} /> Annuler
                 </button>
               </div>
-            )}
+            ) : nextAppointment.status === 'CONFIRMED' ? (
+              <p className="rounded-xl bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-700">
+                Ce rendez-vous est déjà confirmé.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="mb-4 rounded-2xl border bg-white p-5 text-center">
@@ -194,27 +206,48 @@ function PatientPortalContent() {
           ) : (
             appointments.map((apt) => {
               const status = STATUS_LABELS[apt.status] ?? STATUS_LABELS.SCHEDULED
+              const showActions = canPatientAct(apt.status, apt.date) && apt.id !== nextAppointment?.id
               return (
                 <div
                   key={apt.id}
-                  className="mb-3 flex items-center justify-between border-b border-gray-100 pb-3 last:mb-0 last:border-b-0 last:pb-0"
+                  className="mb-3 border-b border-gray-100 pb-3 last:mb-0 last:border-b-0 last:pb-0"
                 >
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{apt.doctorName}</div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {new Date(apt.date).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{apt.doctorName}</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {new Date(apt.date).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
                     </div>
+                    <span
+                      className="rounded-full px-2.5 py-1 text-xs font-medium"
+                      style={{ background: status.bg, color: status.color }}
+                    >
+                      {status.label}
+                    </span>
                   </div>
-                  <span
-                    className="rounded-full px-2.5 py-1 text-xs font-medium"
-                    style={{ background: status.bg, color: status.color }}
-                  >
-                    {status.label}
-                  </span>
+                  {showActions && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => handleAction(apt.id, 'confirm')}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#0f1f3d] px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        <Check size={13} /> Confirmer
+                      </button>
+                      <button
+                        onClick={() => handleAction(apt.id, 'cancel')}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-100 px-3 py-2 text-xs font-semibold text-red-700"
+                      >
+                        <X size={13} /> Annuler
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })

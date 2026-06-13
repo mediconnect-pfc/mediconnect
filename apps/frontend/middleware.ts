@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const publicRoutes = ['/login', '/register', '/forgot-password', '/patient']
+const authRoutes = ['/login', '/register', '/forgot-password']
 
 export function middleware(req: NextRequest) {
   const token = req.cookies.get('token')?.value
@@ -13,7 +14,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (token && publicRoutes.includes(pathname)) {
+  // Redirect logged-in staff away from auth pages only — not the patient portal
+  if (token && authRoutes.includes(pathname)) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 

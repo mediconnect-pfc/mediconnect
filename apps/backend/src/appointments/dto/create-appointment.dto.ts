@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsDateString, IsOptional, IsIn } from 'class-validator';
 
 export class CreateAppointmentDto {
   @IsString()
@@ -15,4 +15,12 @@ export class CreateAppointmentDto {
 
   @IsDateString()
   date: string;
+
+  @IsOptional()
+  @IsIn(['manual', 'ai', 'portal'])
+  source?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

@@ -3,9 +3,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PatientPortalController } from './patient-portal.controller';
 import { PatientPortalService } from './patient-portal.service';
+import { AppointmentsEventsModule } from '../appointments/appointments-events.module';
 
 @Module({
   imports: [
+    AppointmentsEventsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

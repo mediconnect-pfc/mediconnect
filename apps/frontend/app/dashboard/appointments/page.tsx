@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Calendar, Check, Clock, Plus, RefreshCw, X } from 'lucide-react'
+import { Calendar, Check, Clock, Copy, Link2, Plus, RefreshCw, X } from 'lucide-react'
 import { io } from 'socket.io-client'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+import { API_URL, authHeaders, handleAuthResponse } from '@/lib/api'
 
 type AppointmentStatus = 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
 
@@ -15,6 +14,7 @@ interface Appointment {
   date: string
   status: AppointmentStatus
   patient: { id: string; firstName: string; lastName: string; phone: string }
+  portalLink?: string
 }
 
 interface PatientOption {
@@ -37,11 +37,6 @@ const statusConfig: Record<AppointmentStatus, { label: string; className: string
   NO_SHOW: { label: 'No-show', className: 'bg-amber-100 text-amber-700' },
 }
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }
-}
-
 function todayValue() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -57,6 +52,8 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [createdPortalLink, setCreatedPortalLink] = useState('')
+  const [copiedLink, setCopiedLink] = useState('')
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true)
@@ -66,7 +63,7 @@ export default function AppointmentsPage() {
       if (filterDoctorId) params.set('doctorId', filterDoctorId)
       if (filterDate) params.set('date', filterDate)
 
-      const res = await fetch(`${API_URL}/appointments?${params}`, { headers: authHeaders() })
+      const res = await handleAuthResponse(await fetch(`${API_URL}/appointments?${params}`, { headers: authHeaders() }))
       if (!res.ok) throw new Error('Erreur chargement RDV')
       setAppointments(await res.json())
     } catch (err) {
@@ -79,7 +76,7 @@ export default function AppointmentsPage() {
 
   const fetchOptions = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/appointments/options`, { headers: authHeaders() })
+      const res = await handleAuthResponse(await fetch(`${API_URL}/appointments/options`, { headers: authHeaders() }))
       if (!res.ok) return
       const data: { patients?: PatientOption[]; doctors?: DoctorOption[] } = await res.json()
       setPatients(data.patients ?? [])
@@ -116,10 +113,10 @@ export default function AppointmentsPage() {
 
   async function updateStatus(id: string, action: 'confirm' | 'cancel') {
     setError('')
-    const res = await fetch(`${API_URL}/appointments/${id}/${action}`, {
+    const res = await handleAuthResponse(await fetch(`${API_URL}/appointments/${id}/${action}`, {
       method: 'PATCH',
       headers: authHeaders(),
-    })
+    }))
 
     if (!res.ok) {
       setError(action === 'confirm' ? 'Erreur confirmation RDV' : 'Erreur annulation RDV')
@@ -129,26 +126,39 @@ export default function AppointmentsPage() {
     fetchAppointments()
   }
 
+  async function copyPortalLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedLink(link)
+      setTimeout(() => setCopiedLink(''), 2000)
+    } catch {
+      setError('Impossible de copier le lien')
+    }
+  }
+
   async function createAppointment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaving(true)
     setError('')
+    setCreatedPortalLink('')
 
     try {
-      const res = await fetch(`${API_URL}/appointments`, {
+      const res = await handleAuthResponse(await fetch(`${API_URL}/appointments`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(form),
-      })
+      }))
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.message || 'Erreur création RDV')
+        throw new Error(body.message || 'Session expirée. Reconnectez-vous.')
       }
 
+      const created: Appointment & { portalLink?: string } = await res.json()
       setShowForm(false)
-      setForm({ patientId: '', doctorId: '', date: filterDate || todayValue(), time: '09:00' })
-      fetchAppointments()
+      setForm({ patientId: '', doctorId: '', date: form.date, time: '09:00' })
+      setFilterDate(form.date)
+      if (created.portalLink) setCreatedPortalLink(created.portalLink)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur création RDV')
     } finally {
@@ -263,6 +273,29 @@ export default function AppointmentsPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
+      {createdPortalLink && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          <p className="font-medium">RDV créé. Lien patient :</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <a
+              href={createdPortalLink}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-blue-700 underline"
+            >
+              {createdPortalLink}
+            </a>
+            <button
+              type="button"
+              onClick={() => copyPortalLink(createdPortalLink)}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-green-800 ring-1 ring-green-200"
+            >
+              <Copy size={13} /> Copier
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
         {loading ? (
           <div className="flex flex-col items-center justify-center px-6 py-12 text-gray-400">
@@ -298,7 +331,17 @@ export default function AppointmentsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 sm:justify-end">
+                <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                  {appointment.portalLink && (
+                    <button
+                      type="button"
+                      onClick={() => copyPortalLink(appointment.portalLink!)}
+                      className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      title="Copier le lien portail patient"
+                    >
+                      <Link2 size={13} /> {copiedLink === appointment.portalLink ? 'Copié' : 'Lien patient'}
+                    </button>
+                  )}
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${status.className}`}>
                     {status.label}
                   </span>

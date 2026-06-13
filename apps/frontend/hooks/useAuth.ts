@@ -3,15 +3,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@/types'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+import { API_URL, clearAuthToken, getAuthToken } from '@/lib/api'
 
 function setCookie(token: string) {
   document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`
-}
-
-function clearCookie() {
-  document.cookie = 'token=; path=/; max-age=0'
 }
 
 export function useAuth() {
@@ -23,7 +18,7 @@ export function useAuth() {
 
   useEffect(() => {
     let cancelled = false
-    const token = localStorage.getItem('token')
+    const token = getAuthToken()
     if (!token) {
       router.push('/login')
       return
@@ -44,8 +39,8 @@ export function useAuth() {
       })
       .catch(() => {
         if (!cancelled) {
-          localStorage.removeItem('token')
-          clearCookie()
+          clearAuthToken()
+          router.push('/login?expired=1')
         }
       })
       .finally(() => {
@@ -73,8 +68,7 @@ export function useAuth() {
   )
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
-    clearCookie()
+    clearAuthToken()
     setUser(null)
     router.push('/login')
   }, [router])

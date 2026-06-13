@@ -2,12 +2,14 @@ import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppointmentStatus } from '@prisma/client';
+import { AppointmentsAuditService } from '../appointments/appointments-audit.service';
 
 @Injectable()
 export class PatientPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly auditService: AppointmentsAuditService,
   ) {}
 
   async generatePortalToken(appointmentId: string): Promise<string> {
@@ -97,6 +99,7 @@ export class PatientPortalService {
 
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
+      include: { patient: true },
     });
 
     if (!appointment) throw new NotFoundException(`RDV introuvable`);
@@ -104,10 +107,22 @@ export class PatientPortalService {
       throw new UnauthorizedException('Accès refusé');
     }
 
-    return this.prisma.appointment.update({
+    const updated = await this.prisma.appointment.update({
       where: { id },
-      data: { status: AppointmentStatus.CONFIRMED },
+      data: { status: AppointmentStatus.CONFIRMED, source: 'portal' },
     });
+
+    await this.auditService.logStatusChange({
+      userId: appointment.doctorId,
+      establishmentId: appointment.patient.establishmentId,
+      appointmentId: id,
+      action: 'APPOINTMENT_CONFIRMED',
+      previousStatus: appointment.status,
+      newStatus: AppointmentStatus.CONFIRMED,
+      details: { actor: 'patient', patientId: appointment.patientId },
+    });
+
+    return updated;
   }
 
   async cancelAppointment(id: string, token: string) {
@@ -115,6 +130,7 @@ export class PatientPortalService {
 
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
+      include: { patient: true },
     });
 
     if (!appointment) throw new NotFoundException(`RDV introuvable`);
@@ -122,10 +138,22 @@ export class PatientPortalService {
       throw new UnauthorizedException('Accès refusé');
     }
 
-    return this.prisma.appointment.update({
+    const updated = await this.prisma.appointment.update({
       where: { id },
-      data: { status: AppointmentStatus.CANCELLED },
+      data: { status: AppointmentStatus.CANCELLED, source: 'portal' },
     });
+
+    await this.auditService.logStatusChange({
+      userId: appointment.doctorId,
+      establishmentId: appointment.patient.establishmentId,
+      appointmentId: id,
+      action: 'APPOINTMENT_CANCELLED',
+      previousStatus: appointment.status,
+      newStatus: AppointmentStatus.CANCELLED,
+      details: { actor: 'patient', patientId: appointment.patientId },
+    });
+
+    return updated;
   }
 
   private async validateToken(token: string) {
