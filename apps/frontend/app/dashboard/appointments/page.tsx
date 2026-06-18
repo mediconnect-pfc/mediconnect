@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Calendar, Check, Clock, Copy, Link2, Plus, RefreshCw, X } from 'lucide-react'
 import { io } from 'socket.io-client'
-import { API_URL, authHeaders, handleAuthResponse } from '@/lib/api'
+import { API_URL, authHeaders, getAuthToken, handleAuthResponse } from '@/lib/api'
 
 type AppointmentStatus = 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
 
@@ -97,8 +97,15 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     if (!API_URL) return
+    const token = getAuthToken()
+    if (!token) return
 
-    const socket = io(API_URL, { transports: ['websocket'] })
+    const socket = io(API_URL, {
+      transports: ['websocket'],
+      auth: { token },
+      withCredentials: true,
+      reconnection: true,
+    })
     socket.on('appointments:updated', fetchAppointments)
 
     return () => {

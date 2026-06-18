@@ -5,6 +5,8 @@ import { Bell, Menu, Search, Settings } from 'lucide-react'
 
 interface TopbarProps {
   onToggleSidebar: () => void
+  notificationCount?: number
+  onNotificationsClick?: () => void
 }
 
 const pageTitles: Record<string, string> = {
@@ -16,7 +18,11 @@ const pageTitles: Record<string, string> = {
   '/dashboard/ia-monitoring':    'IA Monitoring',
 }
 
-export default function Topbar({ onToggleSidebar }: TopbarProps) {
+export default function Topbar({
+  onToggleSidebar,
+  notificationCount = 0,
+  onNotificationsClick,
+}: TopbarProps) {
   const pathname = usePathname()
   const title = pageTitles[pathname] ?? 'Dashboard'
 
@@ -54,9 +60,17 @@ export default function Topbar({ onToggleSidebar }: TopbarProps) {
         </div>
 
         {/* Notifications */}
-        <button className="relative rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200">
+        <button
+          onClick={onNotificationsClick}
+          className="relative rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200"
+          title="Notifications"
+        >
           <Bell size={18} />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
+          {notificationCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white ring-2 ring-white">
+              {notificationCount > 9 ? '9+' : notificationCount}
+            </span>
+          )}
         </button>
 
         {/* Settings */}

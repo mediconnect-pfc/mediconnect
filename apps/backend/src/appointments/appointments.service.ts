@@ -2,10 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { PatientPortalService } from '../patient-portal/patient-portal.service';
 import { AppointmentsAuditService } from './appointments-audit.service';
+import { SmsConfirmationService } from '../notifications/sms-confirmation.service';
+import { SmsReminderService } from '../notifications/sms-reminder.service';
+import { CallReminderService } from '../notifications/call-reminder.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { FilterAppointmentDto } from './dto/filter-appointment.dto';
-import { AppointmentStatus, Prisma, UserRole } from '@prisma/client';
+import { AppointmentStatus, ConfirmationStatus, Prisma, UserRole } from '@prisma/client';
 
 const appointmentInclude = {
   patient: true,
@@ -18,10 +21,13 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly patientPortalService: PatientPortalService,
     private readonly auditService: AppointmentsAuditService,
+    private readonly smsConfirmationService: SmsConfirmationService,
+    private readonly smsReminderService: SmsReminderService,
+    private readonly callReminderService: CallReminderService,
   ) {}
 
   private buildPortalLink(token: string) {
-    const base = (process.env.FRONTEND_URL || 'http://localhost:3002').replace(/\/$/, '');
+    const base = (process.env.FRONTEND_URL || 'http://localhost:3001').replace(/\/$/, '');
     return `${base}/patient?token=${encodeURIComponent(token)}`;
   }
 
@@ -151,6 +157,35 @@ export class AppointmentsService {
       details: { source: appointment.source },
     });
 
+    void this.smsConfirmationService.scheduleConfirmation({
+      appointmentId: appointment.id,
+      patientId: appointment.patientId,
+      patientFirstName: appointment.patient.firstName,
+      patientLastName: appointment.patient.lastName,
+      patientPhone: appointment.patient.phone,
+      doctorName: appointment.doctor.name,
+      slot: appointment.slot,
+      portalLink,
+    });
+
+    void this.smsReminderService.scheduleReminder({
+      appointmentId: appointment.id,
+      patientId: appointment.patientId,
+      patientFirstName: appointment.patient.firstName,
+      patientLastName: appointment.patient.lastName,
+      patientPhone: appointment.patient.phone,
+      doctorName: appointment.doctor.name,
+      slot: appointment.slot,
+    });
+
+    void this.callReminderService.scheduleReminder({
+      appointmentId: appointment.id,
+      patientId: appointment.patientId,
+      patientPhone: appointment.patient.phone,
+      slot: appointment.slot,
+      establishmentId,
+    });
+
     return { ...this.toResponse(appointment), portalLink };
   }
 
@@ -187,6 +222,26 @@ export class AppointmentsService {
       details: { changes: dto },
     });
 
+    if (slot && slot.getTime() !== existing.slot.getTime()) {
+      void this.smsReminderService.scheduleReminder({
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        patientFirstName: appointment.patient.firstName,
+        patientLastName: appointment.patient.lastName,
+        patientPhone: appointment.patient.phone,
+        doctorName: appointment.doctor.name,
+        slot: appointment.slot,
+      });
+
+      void this.callReminderService.scheduleReminder({
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        patientPhone: appointment.patient.phone,
+        slot: appointment.slot,
+        establishmentId,
+      });
+    }
+
     return this.toResponse(appointment);
   }
 
@@ -221,7 +276,11 @@ export class AppointmentsService {
 
     const appointment = await this.prisma.appointment.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === AppointmentStatus.CONFIRMED && { confirmation: ConfirmationStatus.CONFIRMED }),
+        ...(status === AppointmentStatus.CANCELLED && { confirmation: ConfirmationStatus.CANCELLED }),
+      },
       include: appointmentInclude,
     });
 
@@ -233,6 +292,11 @@ export class AppointmentsService {
       previousStatus: existing.status,
       newStatus: status,
     });
+
+    if (status === AppointmentStatus.CANCELLED) {
+      void this.smsReminderService.cancelReminder(id);
+      void this.callReminderService.cancelReminder(id);
+    }
 
     return this.toResponse(appointment);
   }

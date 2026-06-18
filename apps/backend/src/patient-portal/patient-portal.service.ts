@@ -1,8 +1,10 @@
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus, ConfirmationStatus } from '@prisma/client';
 import { AppointmentsAuditService } from '../appointments/appointments-audit.service';
+import { SmsReminderService } from '../notifications/sms-reminder.service';
+import { CallReminderService } from '../notifications/call-reminder.service';
 
 @Injectable()
 export class PatientPortalService {
@@ -10,6 +12,8 @@ export class PatientPortalService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly auditService: AppointmentsAuditService,
+    private readonly smsReminderService: SmsReminderService,
+    private readonly callReminderService: CallReminderService,
   ) {}
 
   async generatePortalToken(appointmentId: string): Promise<string> {
@@ -109,7 +113,11 @@ export class PatientPortalService {
 
     const updated = await this.prisma.appointment.update({
       where: { id },
-      data: { status: AppointmentStatus.CONFIRMED, source: 'portal' },
+      data: {
+        status: AppointmentStatus.CONFIRMED,
+        confirmation: ConfirmationStatus.CONFIRMED,
+        source: 'portal',
+      },
     });
 
     await this.auditService.logStatusChange({
@@ -140,7 +148,11 @@ export class PatientPortalService {
 
     const updated = await this.prisma.appointment.update({
       where: { id },
-      data: { status: AppointmentStatus.CANCELLED, source: 'portal' },
+      data: {
+        status: AppointmentStatus.CANCELLED,
+        confirmation: ConfirmationStatus.CANCELLED,
+        source: 'portal',
+      },
     });
 
     await this.auditService.logStatusChange({
@@ -152,6 +164,9 @@ export class PatientPortalService {
       newStatus: AppointmentStatus.CANCELLED,
       details: { actor: 'patient', patientId: appointment.patientId },
     });
+
+    void this.smsReminderService.cancelReminder(id);
+    void this.callReminderService.cancelReminder(id);
 
     return updated;
   }

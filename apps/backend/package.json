@@ -21,7 +21,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"commonjs\",\"moduleResolution\":\"node\"} prisma/seed.ts"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node --compiler-options {\"module\":\"commonjs\",\"moduleResolution\":\"node\"} prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",
@@ -42,6 +42,7 @@
     "csv-parse": "^6.2.1",
     "dotenv": "^17.4.2",
     "ioredis": "^5.10.1",
+    "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^5.22.0",
@@ -76,9 +77,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"commonjs\",\"moduleResolution\":\"node\"} prisma/seed.ts"
   },
   "jest": {
     "moduleFileExtensions": [
