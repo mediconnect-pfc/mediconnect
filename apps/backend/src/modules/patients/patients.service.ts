@@ -186,7 +186,7 @@ export class PatientsService {
         }
 
         if (!/^(?:\+?[1-9]\d{7,14}|0\d{9})$/.test(row.phone)) {
-          errors.push({ row: i + 1, message: 'Téléphone invalide (10 chiffres requis)' });
+          errors.push({ row: i + 1, message: 'Telephone invalide (9 a 15 chiffres ou format local 0XXXXXXXXX)' });
           continue;
         }
 
@@ -195,17 +195,17 @@ export class PatientsService {
           : [];
 
         await this.prisma.patient.create({
-      data: {
-        firstName: row.firstName,
-        lastName: row.lastName,
-        phone: row.phone,
-        birthDate: row.birthDate ? new Date(row.birthDate) : undefined,
-        tags,
-        status: (row.status as any) || 'ACTIF',
-        establishmentId,
-        portalToken: crypto.randomUUID(),
-        portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      },
+          data: {
+            firstName: row.firstName,
+            lastName: row.lastName,
+            phone: row.phone,
+            birthDate: row.birthDate ? new Date(row.birthDate) : undefined,
+            tags,
+            status: (row.status as any) || 'ACTIF',
+            establishmentId,
+            portalToken: crypto.randomUUID(),
+            portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          },
         });
         imported++;
       } catch (err: any) {

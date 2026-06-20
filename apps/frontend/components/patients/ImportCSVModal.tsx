@@ -101,7 +101,7 @@ export default function ImportCSVModal({ open, onClose, onImport }: ImportCSVMod
         {error && (
           <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
+            <pre className="whitespace-pre-wrap font-sans">{error}</pre>
           </div>
         )}
 
