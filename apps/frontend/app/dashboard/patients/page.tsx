@@ -57,8 +57,18 @@ export default function PatientsPage() {
   }
 
   async function handleImport(file: File) {
-    const ok = await importCSV(file)
-    if (!ok) throw new Error('Échec de l\'import. Vérifiez le format du fichier.')
+    const { success, result, error } = await importCSV(file)
+    if (!success) throw new Error(error || 'Échec de l\'import')
+    const imported = result?.imported ?? 0
+    const total = result?.total ?? 0
+    const errs: string[] = (result?.errors ?? []).map((e: any) => `Ligne ${e.row}: ${e.message}`)
+    const msg = [`${imported}/${total} importés`]
+    if (errs.length) {
+      msg.push('')
+      msg.push('Erreurs :')
+      msg.push(...errs)
+    }
+    if (errs.length) throw new Error(msg.join('\n'))
     fetchPatients(page, search, status)
   }
 

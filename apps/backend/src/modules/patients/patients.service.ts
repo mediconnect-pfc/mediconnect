@@ -185,8 +185,8 @@ export class PatientsService {
           continue;
         }
 
-        if (!/^\d{10}$/.test(row.phone)) {
-          errors.push({ row: i + 1, message: 'Téléphone invalide (10 chiffres requis)' });
+        if (!/^\+?\d{9,15}$/.test(row.phone)) {
+          errors.push({ row: i + 1, message: 'Téléphone invalide (9 à 15 chiffres)' });
           continue;
         }
 

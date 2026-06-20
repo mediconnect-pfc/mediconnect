@@ -46,7 +46,7 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
     if (!form.firstName) errs.firstName = 'Requis'
     if (!form.lastName) errs.lastName = 'Requis'
     if (!form.phone) errs.phone = 'Requis'
-    else if (!/^\d{10}$/.test(form.phone)) errs.phone = '10 chiffres requis'
+    else if (!/^\+?\d{9,15}$/.test(form.phone)) errs.phone = '9 à 15 chiffres requis'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -117,7 +117,7 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
           id="phone"
           label="Téléphone (10 chiffres)"
           value={form.phone}
-          onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+          onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
           error={errors.phone}
         />
         <Input
