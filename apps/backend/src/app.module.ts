@@ -14,6 +14,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { InteractionsModule } from './interactions/interactions.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { DossiersModule } from './dossiers/dossiers.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { DossiersModule } from './dossiers/dossiers.module';
     InteractionsModule,
     CampaignsModule,
     DossiersModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
