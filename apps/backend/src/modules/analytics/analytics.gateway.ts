@@ -3,18 +3,20 @@ import {
   WebSocketServer,
   OnGatewayInit,
   OnGatewayConnection,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { AnalyticsService } from './analytics.service';
+import type { AuthenticatedUser } from '../../common/types/authenticated-user.type';
 
 @WebSocketGateway({
   namespace: '/analytics/kpis',
   cors: { origin: '*', credentials: true },
 })
-export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection {
+export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(AnalyticsGateway.name);
   private interval: ReturnType<typeof setInterval> | null = null;
 
@@ -29,37 +31,36 @@ export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection {
     this.logger.log('WebSocket gateway initialized');
     this.interval = setInterval(async () => {
       try {
-        const today = new Date();
-        const startDate = today.toISOString().slice(0, 10);
-        const endDate = startDate;
-        const kpis = await this.analyticsService.computeKpis(startDate, endDate);
+        const kpis = await this.analyticsService.computeDashboardKpis();
         this.server.emit('kpi_update', kpis);
       } catch (err) {
-        this.logger.error('KPI computation failed', err);
+        this.logger.error('Failed to compute KPIs', err);
       }
     }, 5000);
   }
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth?.token || client.handshake.query?.token as string;
+      const token = client.handshake.auth?.token || (client.handshake.query?.token as string);
       if (!token) {
         client.emit('error', 'Token requis');
         client.disconnect();
         return;
       }
+
       const secret = this.configService.get<string>('JWT_SECRET')!;
-      jwt.verify(token, secret);
+      const payload = jwt.verify(token, secret) as AuthenticatedUser & { type?: string };
+
       this.logger.log(`Client connected: ${client.id}`);
-      const today = new Date();
-      const kpis = await this.analyticsService.computeKpis(
-        today.toISOString().slice(0, 10),
-        today.toISOString().slice(0, 10),
-      );
+      const kpis = await this.analyticsService.computeDashboardKpis(payload.establishmentId ?? null);
       client.emit('kpi_update', kpis);
     } catch {
       client.emit('error', 'Token invalide');
       client.disconnect();
     }
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
   }
 }

@@ -109,7 +109,9 @@ export default function AnalyticsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">Date debut</label>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                Date debut
+              </label>
               <input
                 id="startDate"
                 type="date"
@@ -119,7 +121,9 @@ export default function AnalyticsPage() {
               />
             </div>
             <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">Date fin</label>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                Date fin
+              </label>
               <input
                 id="endDate"
                 type="date"

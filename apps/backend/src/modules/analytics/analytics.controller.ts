@@ -105,7 +105,7 @@ export class AnalyticsController {
 
     doc.fontSize(18).font('Helvetica-Bold').text('Analytics KPI Report', { align: 'center' });
     doc.moveDown();
-    doc.fontSize(11).font('Helvetica').text(`Période: ${kpis.period.startDate} -> ${kpis.period.endDate}`);
+    doc.fontSize(11).font('Helvetica').text(`Periode: ${kpis.period.startDate} -> ${kpis.period.endDate}`);
     doc.moveDown();
     doc.font('Helvetica-Bold').text(`Total appointments: ${kpis.metrics.totalAppointments}`);
     doc.font('Helvetica-Bold').text(`Confirmation rate: ${kpis.metrics.confirmationRate}%`);
