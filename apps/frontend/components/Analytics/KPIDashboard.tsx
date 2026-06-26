@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import KPICard from './KPICard'
 import Button from '@/components/ui/Button'
-import { RefreshCw, Download, Settings, BarChart3 } from 'lucide-react'
+import { RefreshCw, Download, FileText, Settings, BarChart3 } from 'lucide-react'
 import type { KpiData } from '@/hooks/useKPIWebSocket'
 
 interface KPIDashboardProps {
@@ -12,7 +12,12 @@ interface KPIDashboardProps {
   connected: boolean
   lastUpdated: string | null
   onRefresh: () => void
-  onExport: () => void
+  onExportCSV: () => void
+  onExportPDF: () => void
+  startDate?: string
+  endDate?: string
+  onStartDateChange?: (d: string) => void
+  onEndDateChange?: (d: string) => void
 }
 
 function timeAgo(iso: string): string {
@@ -32,7 +37,11 @@ const kpiConfig: { key: keyof KpiData; title: string; unit: string; icon: string
   { key: 'uptime', title: 'Disponibilité', unit: '%', icon: '⏱️', healthy: v => v >= 99.9, warning: v => v >= 99 },
 ]
 
-export default function KPIDashboard({ kpis, loading, connected, lastUpdated, onRefresh, onExport }: KPIDashboardProps) {
+export default function KPIDashboard({
+  kpis, loading, connected, lastUpdated, onRefresh,
+  onExportCSV, onExportPDF,
+  startDate, endDate, onStartDateChange, onEndDateChange,
+}: KPIDashboardProps) {
   const [showSettings, setShowSettings] = useState(false)
 
   return (
@@ -49,12 +58,32 @@ export default function KPIDashboard({ kpis, loading, connected, lastUpdated, on
             {lastUpdated && <span>Dernière mise à jour : {timeAgo(lastUpdated)}</span>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onStartDateChange && onEndDateChange && (
+            <>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => onStartDateChange(e.target.value)}
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <span className="text-gray-400">→</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => onEndDateChange(e.target.value)}
+                className="rounded border px-2 py-1 text-sm"
+              />
+            </>
+          )}
           <Button variant="secondary" size="sm" icon={<RefreshCw size={16} />} onClick={onRefresh} loading={loading}>
             Actualiser
           </Button>
-          <Button variant="secondary" size="sm" icon={<Download size={16} />} onClick={onExport}>
+          <Button variant="secondary" size="sm" icon={<Download size={16} />} onClick={onExportCSV}>
             Export CSV
+          </Button>
+          <Button variant="secondary" size="sm" icon={<FileText size={16} />} onClick={onExportPDF}>
+            Export PDF
           </Button>
           <Button variant="ghost" size="sm" icon={<Settings size={16} />} onClick={() => setShowSettings(!showSettings)}>
             Paramètres
