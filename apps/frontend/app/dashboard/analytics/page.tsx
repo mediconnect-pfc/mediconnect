@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { FileText, Download } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null
@@ -23,6 +23,25 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click()
   document.body.removeChild(a)
   window.URL.revokeObjectURL(url)
+}
+
+async function fetchAnalyticsExport(format: 'csv' | 'pdf', startDate: string, endDate: string) {
+  const token = getToken()
+  if (!token) throw new Error('Non authentifie')
+
+  const res = await fetch(
+    `${API_URL}/analytics/export?format=${format}&dateFrom=${startDate}&dateTo=${endDate}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || `Erreur export ${format}`)
+  }
+
+  downloadBlob(await res.blob(), `analytics-${startDate}-${endDate}.${format}`)
 }
 
 async function exportPatients(format: 'pdf' | 'csv', startDate: string, endDate: string) {
@@ -41,29 +60,6 @@ async function exportPatients(format: 'pdf' | 'csv', startDate: string, endDate:
   downloadBlob(await res.blob(), `patients-${startDate}-${endDate}.${format}`)
 }
 
-function downloadCsv(kpis: any) {
-  const headers = ['Indicateur', 'Valeur', 'Unite']
-  const rows = [
-    ['Utilisateurs actifs', kpis.activeUsers, 'utilisateurs'],
-    ['Requetes aujourd\'hui', kpis.requestsToday, 'requetes'],
-    ['Taux de succes', kpis.successRate, '%'],
-    ['Temps de reponse moyen', kpis.avgResponseTime, 'ms'],
-    ['Erreurs', kpis.errorCount, 'erreurs'],
-    ['Transactions/min', kpis.transactionsPerMin, 'tpm'],
-    ['Disponibilite', kpis.uptime, '%'],
-  ]
-  const csv = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `kpis-${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
 export default function AnalyticsPage() {
   const { kpis, loading, connected, lastUpdated, refresh } = useKPIWebSocket()
   const today = new Date().toISOString().slice(0, 10)
@@ -75,20 +71,42 @@ export default function AnalyticsPage() {
   const [endDate, setEndDate] = useState(today)
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null)
   const [error, setError] = useState('')
+  const [patientExporting, setPatientExporting] = useState<'pdf' | 'csv' | null>(null)
+  const [patientError, setPatientError] = useState('')
 
-  const handleKpiExport = useCallback(() => {
-    if (kpis) downloadCsv(kpis)
-  }, [kpis])
-
-  async function handleExport(format: 'pdf' | 'csv') {
+  const handleExportCSV = useCallback(async () => {
     setError('')
-    setExporting(format)
+    setExporting('csv')
+    try {
+      await fetchAnalyticsExport('csv', startDate, endDate)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur export CSV')
+    } finally {
+      setExporting(null)
+    }
+  }, [startDate, endDate])
+
+  const handleExportPDF = useCallback(async () => {
+    setError('')
+    setExporting('pdf')
+    try {
+      await fetchAnalyticsExport('pdf', startDate, endDate)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur export PDF')
+    } finally {
+      setExporting(null)
+    }
+  }, [startDate, endDate])
+
+  async function handlePatientExport(format: 'pdf' | 'csv') {
+    setPatientError('')
+    setPatientExporting(format)
     try {
       await exportPatients(format, startDate, endDate)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur d\'export')
+      setPatientError(err instanceof Error ? err.message : 'Erreur d\'export')
     } finally {
-      setExporting(null)
+      setPatientExporting(null)
     }
   }
 
@@ -100,8 +118,15 @@ export default function AnalyticsPage() {
         connected={connected}
         lastUpdated={lastUpdated}
         onRefresh={refresh}
-        onExport={handleKpiExport}
+        onExportCSV={handleExportCSV}
+        onExportPDF={handleExportPDF}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
       />
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
 
       <Card>
         <div className="space-y-5">
@@ -109,11 +134,11 @@ export default function AnalyticsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="patientStartDate" className="block text-sm font-medium text-gray-700">
                 Date debut
               </label>
               <input
-                id="startDate"
+                id="patientStartDate"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -121,11 +146,11 @@ export default function AnalyticsPage() {
               />
             </div>
             <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="patientEndDate" className="block text-sm font-medium text-gray-700">
                 Date fin
               </label>
               <input
-                id="endDate"
+                id="patientEndDate"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -137,24 +162,24 @@ export default function AnalyticsPage() {
           <div className="flex flex-wrap gap-3">
             <Button
               icon={<FileText size={16} />}
-              loading={exporting === 'pdf'}
+              loading={patientExporting === 'pdf'}
               disabled={!startDate || !endDate}
-              onClick={() => handleExport('pdf')}
+              onClick={() => handlePatientExport('pdf')}
             >
               Exporter PDF
             </Button>
             <Button
               variant="secondary"
               icon={<Download size={16} />}
-              loading={exporting === 'csv'}
+              loading={patientExporting === 'csv'}
               disabled={!startDate || !endDate}
-              onClick={() => handleExport('csv')}
+              onClick={() => handlePatientExport('csv')}
             >
               Exporter CSV
             </Button>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {patientError && <p className="text-sm text-red-500">{patientError}</p>}
         </div>
       </Card>
     </div>
