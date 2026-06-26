@@ -55,3 +55,40 @@ export interface PaginatedResponse<T> {
   page: number
   totalPages: number
 }
+
+/* ── FE-008 Timeline types ── */
+
+export interface InteractionData {
+  id: string
+  type: 'CALL' | 'SMS'
+  direction: 'OUTBOUND' | 'INBOUND'
+  duration?: number
+  intent: 'confirmed' | 'cancelled' | 'no_response' | 'unreachable'
+  sentiment?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE'
+  transcript?: string
+  createdAt: string
+}
+
+export interface AppointmentData {
+  id: string
+  status: 'confirmed' | 'cancelled' | 'pending' | 'no_show'
+  doctorName: string
+  specialty: string
+  dateTime: string
+  source: 'manual' | 'call' | 'portal'
+}
+
+export interface MedicalRecordData {
+  id: string
+  doctorName: string
+  date: string
+  notes?: string
+  prescriptions?: string
+}
+
+export interface TimelineItem {
+  id: string
+  type: 'interaction' | 'appointment' | 'medical_record'
+  timestamp: string
+  data: InteractionData | AppointmentData | MedicalRecordData
+}

@@ -90,7 +90,6 @@ export default function AnalyticsPage() {
   const { kpis, loading, connected, lastUpdated, refresh } = useKPIWebSocket()
   const [startDate, setStartDate] = useState(getThirtyDaysAgo)
   const [endDate, setEndDate] = useState(getToday)
-  const [metrics, setMetrics] = useState<KpiMetrics | null>(null)
   const [chartData, setChartData] = useState<ChartRow[]>([])
   const [chartLoading, setChartLoading] = useState(true)
   const [chartError, setChartError] = useState<string | null>(null)
@@ -110,8 +109,6 @@ export default function AnalyticsPage() {
         throw new Error(res.status === 401 ? 'Non authentifie' : `Erreur ${res.status}`)
       }
       const json: KpiReportResponse = await res.json()
-      setMetrics(json.metrics)
-
       const days = getDaysBetween(start, end)
       const confirmationRate = json.metrics.confirmationRate / 100
       const cancellationRate = json.metrics.cancellationRate / 100
@@ -226,8 +223,6 @@ export default function AnalyticsPage() {
           {chartError}
         </div>
       )}
-
-      {metrics && !chartLoading && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" />}
 
       {chartData.length > 0 && !chartLoading && (
         <>
