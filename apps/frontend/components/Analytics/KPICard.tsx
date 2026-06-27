@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react'
 
 export interface KPICardProps {
   title: string
-  value?: number
+  value: number
   unit: string
-  status?: 'healthy' | 'warning' | 'critical'
+  status: 'healthy' | 'warning' | 'critical'
   icon: string
   trend?: number
 }
@@ -23,7 +23,7 @@ const statusIcons = {
   critical: '❌',
 }
 
-export default function KPICard({ title, value, unit, status = 'healthy', icon, trend }: KPICardProps) {
+export default function KPICard({ title, value, unit, status, icon, trend }: KPICardProps) {
   const prevRef = useRef(value)
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function KPICard({ title, value, unit, status = 'healthy', icon, 
         <span className="text-lg">{statusIcons[status]}</span>
       </div>
       <p className="mt-3 text-2xl font-bold text-gray-900">
-        {value !== undefined ? value.toLocaleString() : '—'}
+        {value.toLocaleString()}
         <span className="ml-1 text-sm font-normal text-gray-500">{unit}</span>
       </p>
       <div className="mt-1 flex items-center justify-between">
