@@ -92,3 +92,35 @@ export interface TimelineItem {
   timestamp: string
   data: InteractionData | AppointmentData | MedicalRecordData
 }
+
+export type CampaignType = 'SMS' | 'VOICE' | 'EMERGENCY'
+export type CampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'PAUSED'
+export type MessageStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED'
+
+export interface CampaignStats {
+  totalMessages: number
+  sent: number
+  delivered: number
+  failed: number
+}
+
+export interface Campaign {
+  id: string
+  establishmentId: string
+  name: string
+  type: CampaignType
+  status: CampaignStatus
+  segment?: string | null
+  message?: string | null
+  flowId?: string | null
+  scheduledAt?: string | null
+  completedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  stats?: CampaignStats
+}
+
+export interface CampaignDetailResponse {
+  campaign: Campaign
+  stats: CampaignStats
+}

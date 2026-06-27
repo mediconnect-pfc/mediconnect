@@ -22,6 +22,13 @@ export function authHeaders(): Record<string, string> {
     : { 'Content-Type': 'application/json' }
 }
 
+export function authHeadersWithToken(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
+}
+
 export function redirectToLogin(expired = false) {
   clearAuthToken()
   const url = expired ? '/login?expired=1' : '/login'
@@ -34,4 +41,70 @@ export async function handleAuthResponse(res: Response): Promise<Response> {
     throw new Error('Session expirée')
   }
   return res
+}
+
+export interface CampaignInput {
+  name: string
+  type: 'SMS' | 'VOICE' | 'EMERGENCY'
+  message: string
+  segment?: string | null
+  scheduledAt?: string | null
+}
+
+export async function getCampaigns(token?: string) {
+  const headers = token ? authHeadersWithToken(token) : authHeaders()
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns`, { headers }))
+  if (!res.ok) throw new Error('Erreur chargement campagnes')
+  return res.json()
+}
+
+export async function getCampaignStats(id: string, token?: string) {
+  const headers = token ? authHeadersWithToken(token) : authHeaders()
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns/${id}`, { headers }))
+  if (!res.ok) throw new Error('Erreur chargement campagne')
+  return res.json()
+}
+
+export async function createCampaign(token: string, data: CampaignInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns`, {
+    method: 'POST',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur creation campagne')
+  }
+
+  return res.json()
+}
+
+export async function launchCampaign(token: string, id: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns/${id}/launch`, {
+    method: 'POST',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify({}),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur lancement campagne')
+  }
+
+  return res.json()
+}
+
+export async function pauseCampaign(token: string, id: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns/${id}/pause`, {
+    method: 'PATCH',
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur pause campagne')
+  }
+
+  return res.json()
 }

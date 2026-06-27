@@ -10,6 +10,7 @@ import {
   Calendar,
   CreditCard,
   Bot,
+  Megaphone,
   LogOut,
   HelpCircle,
   Plus,
@@ -20,6 +21,7 @@ import type { User } from '@/types'
 const navItems = [
   { label: 'Dashboard',     href: '/dashboard',                  icon: LayoutDashboard },
   { label: 'Patients',      href: '/dashboard/patients',         icon: Users },
+  { label: 'Campagnes',     href: '/dashboard/campaigns',       icon: Megaphone },
   { label: 'Clinics',       href: '/dashboard/clinics',          icon: Building2 },
   { label: 'Appointments',  href: '/dashboard/appointments',     icon: Calendar },
   { label: 'Financials',    href: '/dashboard/financials',       icon: CreditCard },
