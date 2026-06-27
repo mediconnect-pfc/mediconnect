@@ -93,8 +93,7 @@ export class CallReminderService {
       await this.queue.add(CALL_REMINDER_JOB_NAME, jobData, {
         jobId: `${CALL_REMINDER_JOB_ID_PREFIX}${params.appointmentId}`,
         delay,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 60_000 },
+        attempts: 1,
         removeOnComplete: true,
         removeOnFail: false,
       });

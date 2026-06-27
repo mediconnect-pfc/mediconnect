@@ -28,6 +28,8 @@ const statusOptions = [
   { value: 'NO_SHOW', label: 'No-show' },
 ]
 
+const phoneRegex = /^(?:\+?[1-9]\d{7,14}|0\d{9})$/
+
 export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
   const [form, setForm] = useState<PatientFormData>({
     firstName: initial?.firstName || '',
@@ -46,7 +48,7 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
     if (!form.firstName) errs.firstName = 'Requis'
     if (!form.lastName) errs.lastName = 'Requis'
     if (!form.phone) errs.phone = 'Requis'
-    else if (!/^\d{10}$/.test(form.phone)) errs.phone = '10 chiffres requis'
+    else if (!phoneRegex.test(form.phone)) errs.phone = 'Telephone invalide'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -82,7 +84,9 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
       title={initial ? 'Modifier le patient' : 'Nouveau patient'}
       actions={
         <>
-          <Button variant="secondary" onClick={onClose}>Annuler</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Annuler
+          </Button>
           <Button loading={saving} onClick={handleSubmit}>
             {initial ? 'Enregistrer' : 'Créer'}
           </Button>
@@ -115,9 +119,16 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
         />
         <Input
           id="phone"
-          label="Téléphone (10 chiffres)"
+          label="Téléphone"
+          inputMode="tel"
           value={form.phone}
-          onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+          onChange={(e) => {
+            const cleaned = e.target.value
+              .replace(/[^\d+]/g, '')
+              .replace(/(?!^)\+/g, '')
+              .slice(0, 16)
+            set('phone', cleaned)
+          }}
           error={errors.phone}
         />
         <Input
@@ -134,7 +145,9 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
           onChange={(e) => set('address', e.target.value)}
         />
         <div>
-          <label htmlFor="status" className="block text-sm font-medium text-gray-700">Statut</label>
+          <label htmlFor="status" className="block text-sm font-medium text-gray-700">
+            Statut
+          </label>
           <select
             id="status"
             value={form.status}
@@ -142,7 +155,9 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
             className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           >
             {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
         </div>

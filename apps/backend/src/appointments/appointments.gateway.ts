@@ -10,6 +10,12 @@ import { AppointmentStatus, InteractionType, UserRole } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 
+const allowedOrigins = [
+  'http://localhost:3001',
+  process.env.FRONTEND_URL,
+  process.env.PATIENT_PORTAL_URL,
+].filter(Boolean) as string[];
+
 interface JwtPayload {
   sub: string;
   type: 'user' | 'superadmin';
@@ -61,7 +67,7 @@ export interface InteractionRealtimePayload {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || true,
+    origin: allowedOrigins,
     credentials: true,
   },
 })

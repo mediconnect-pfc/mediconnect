@@ -11,6 +11,9 @@ import { EstablishmentsModule } from './establishments/establishments.module';
 import { PatientPortalModule } from './patient-portal/patient-portal.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { InteractionsModule } from './interactions/interactions.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { DossiersModule } from './dossiers/dossiers.module';
 
 @Module({
   imports: [
@@ -37,6 +40,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     PatientPortalModule,
     AppointmentsModule,
     NotificationsModule,
+    InteractionsModule,
+    CampaignsModule,
+    DossiersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

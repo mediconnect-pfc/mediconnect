@@ -1,16 +1,18 @@
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppointmentStatus, ConfirmationStatus } from '@prisma/client';
 import { AppointmentsAuditService } from '../appointments/appointments-audit.service';
 import { SmsReminderService } from '../notifications/sms-reminder.service';
 import { CallReminderService } from '../notifications/call-reminder.service';
+import { randomBytes } from 'crypto';
+
+const PORTAL_TOKEN_BYTES = 18;
+const PORTAL_TOKEN_TTL_DAYS = 7;
 
 @Injectable()
 export class PatientPortalService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
     private readonly auditService: AppointmentsAuditService,
     private readonly smsReminderService: SmsReminderService,
     private readonly callReminderService: CallReminderService,
@@ -26,13 +28,10 @@ export class PatientPortalService {
       throw new NotFoundException(`RDV #${appointmentId} introuvable`);
     }
 
-    const token = this.jwtService.sign(
-      { appointmentId, patientId: appointment.patientId },
-      { expiresIn: '7d' },
-    );
+    const token = await this.generateUniqueOpaqueToken();
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + PORTAL_TOKEN_TTL_DAYS);
 
     await this.prisma.appointment.update({
       where: { id: appointmentId },
@@ -64,9 +63,14 @@ export class PatientPortalService {
     }
 
     const now = new Date();
-    const nextAppointment = patient.appointments.find(
-      (a) => a.slot > now && a.status !== AppointmentStatus.CANCELLED,
-    ) ?? null;
+    const currentAppointment = patient.appointments.find((a) => a.id === appointment.id) ?? null;
+    const nextAppointment =
+      patient.appointments.find(
+        (a) =>
+          a.id !== appointment.id &&
+          a.slot > now &&
+          a.status === AppointmentStatus.SCHEDULED,
+      ) ?? null;
 
     return {
       patient: {
@@ -75,6 +79,14 @@ export class PatientPortalService {
         lastName: patient.lastName,
         phone: patient.phone,
       },
+      currentAppointment: currentAppointment
+        ? {
+            id: currentAppointment.id,
+            doctorName: currentAppointment.doctor.name,
+            date: currentAppointment.slot,
+            status: currentAppointment.status,
+          }
+        : null,
       nextAppointment: nextAppointment
         ? {
             id: nextAppointment.id,
@@ -172,12 +184,6 @@ export class PatientPortalService {
   }
 
   private async validateToken(token: string) {
-    try {
-      this.jwtService.verify(token);
-    } catch {
-      throw new UnauthorizedException('Token invalide ou expiré');
-    }
-
     const appointment = await this.prisma.appointment.findUnique({
       where: { portalToken: token },
     });
@@ -189,5 +195,18 @@ export class PatientPortalService {
     }
 
     return appointment;
+  }
+
+  private async generateUniqueOpaqueToken(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const token = randomBytes(PORTAL_TOKEN_BYTES).toString('base64url');
+      const existing = await this.prisma.appointment.findUnique({
+        where: { portalToken: token },
+        select: { id: true },
+      });
+      if (!existing) return token;
+    }
+
+    throw new Error('Unable to generate a unique portal token');
   }
 }

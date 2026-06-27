@@ -27,8 +27,12 @@ export class AppointmentsService {
   ) {}
 
   private buildPortalLink(token: string) {
-    const base = (process.env.FRONTEND_URL || 'http://localhost:3001').replace(/\/$/, '');
-    return `${base}/patient?token=${encodeURIComponent(token)}`;
+    const base = (
+      process.env.PATIENT_PORTAL_URL ||
+      process.env.FRONTEND_URL ||
+      'http://localhost:3001'
+    ).replace(/\/$/, '');
+    return `${base}/patient?t=${encodeURIComponent(token)}`;
   }
 
   private dayRange(date: Date) {

@@ -5,30 +5,32 @@ import { PatientPortalService } from './patient-portal.service';
 export class PatientPortalController {
   constructor(private readonly patientPortalService: PatientPortalService) {}
 
-  // GET /patient/portal?token=xxx → données du patient
   @Get()
-  getPortalData(@Query('token') token: string) {
-    if (!token) throw new UnauthorizedException('Token manquant');
-    return this.patientPortalService.getPortalData(token);
+  getPortalData(@Query('t') shortToken?: string, @Query('token') token?: string) {
+    const portalToken = shortToken || token;
+    if (!portalToken) throw new UnauthorizedException('Token manquant');
+    return this.patientPortalService.getPortalData(portalToken);
   }
 
-  // PATCH /patient/portal/rdv/:id/confirm → confirmer RDV
   @Patch('rdv/:id/confirm')
   confirmAppointment(
     @Param('id') id: string,
-    @Query('token') token: string,
+    @Query('t') shortToken?: string,
+    @Query('token') token?: string,
   ) {
-    if (!token) throw new UnauthorizedException('Token manquant');
-    return this.patientPortalService.confirmAppointment(id, token);
+    const portalToken = shortToken || token;
+    if (!portalToken) throw new UnauthorizedException('Token manquant');
+    return this.patientPortalService.confirmAppointment(id, portalToken);
   }
 
-  // PATCH /patient/portal/rdv/:id/cancel → annuler RDV
   @Patch('rdv/:id/cancel')
   cancelAppointment(
     @Param('id') id: string,
-    @Query('token') token: string,
+    @Query('t') shortToken?: string,
+    @Query('token') token?: string,
   ) {
-    if (!token) throw new UnauthorizedException('Token manquant');
-    return this.patientPortalService.cancelAppointment(id, token);
+    const portalToken = shortToken || token;
+    if (!portalToken) throw new UnauthorizedException('Token manquant');
+    return this.patientPortalService.cancelAppointment(id, portalToken);
   }
 }
