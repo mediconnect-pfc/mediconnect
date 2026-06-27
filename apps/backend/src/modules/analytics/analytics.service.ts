@@ -8,26 +8,42 @@ export class AnalyticsService {
 
   constructor(private prisma: PrismaService) {}
 
-  async computeKpis(startDate: string, endDate: string): Promise<KpiResponse> {
+  async computeKpis(
+    startDate: string,
+    endDate: string,
+    establishmentId?: string | null,
+  ): Promise<KpiResponse> {
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
     const dateFilter = { gte: start, lte: end };
+    const appointmentWhere = establishmentId
+      ? {
+          slot: dateFilter,
+          patient: { establishmentId, deletedAt: null },
+        }
+      : { slot: dateFilter };
+    const campaignWhere = establishmentId
+      ? {
+          createdAt: dateFilter,
+          campaign: { establishmentId },
+        }
+      : { createdAt: dateFilter };
 
     const [totalAppointments, confirmedAppointments, cancelledAppointments, totalSMSSent] =
       await Promise.all([
         this.prisma.appointment.count({
-          where: { slot: dateFilter },
+          where: appointmentWhere,
         }),
         this.prisma.appointment.count({
-          where: { slot: dateFilter, status: 'CONFIRMED' },
+          where: { ...appointmentWhere, status: 'CONFIRMED' },
         }),
         this.prisma.appointment.count({
-          where: { slot: dateFilter, status: 'CANCELLED' },
+          where: { ...appointmentWhere, status: 'CANCELLED' },
         }),
         this.prisma.campaignMessage.count({
-          where: { createdAt: dateFilter },
+          where: campaignWhere,
         }),
       ]);
 
