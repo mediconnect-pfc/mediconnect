@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Pause, Play, RotateCcw } from 'lucide-react'
+import { Calendar, Pause, RotateCcw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import CampaignStats from './CampaignStats'
@@ -9,18 +9,17 @@ import type { Campaign } from '@/types'
 interface CampaignListProps {
   campaigns: Campaign[]
   loading?: boolean
-  onLaunch: (campaign: Campaign) => void
   onPause: (campaign: Campaign) => Promise<void> | void
   onRefresh: () => void
-  launchingId?: string | null
   pausingId?: string | null
+  canManage?: boolean
 }
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info'; className?: string }> = {
   DRAFT: { label: 'Brouillon', variant: 'info' },
-  SCHEDULED: { label: 'Planifiée', variant: 'warning' },
+  SCHEDULED: { label: 'Planifiee', variant: 'warning' },
   RUNNING: { label: 'En cours', variant: 'info', className: 'bg-blue-100 text-blue-700' },
-  COMPLETED: { label: 'Terminée', variant: 'success' },
+  COMPLETED: { label: 'Terminee', variant: 'success' },
   PAUSED: { label: 'En pause', variant: 'warning' },
 }
 
@@ -34,11 +33,10 @@ function formatDate(value?: string | null) {
 export default function CampaignList({
   campaigns,
   loading,
-  onLaunch,
   onPause,
   onRefresh,
-  launchingId,
   pausingId,
+  canManage = true,
 }: CampaignListProps) {
   if (loading) {
     return (
@@ -60,8 +58,8 @@ export default function CampaignList({
     <div className="space-y-4">
       {campaigns.map((campaign) => {
         const status = statusMap[campaign.status] ?? statusMap.DRAFT
-        const canLaunch = campaign.status !== 'RUNNING' && campaign.status !== 'COMPLETED'
-        const canPause = campaign.status === 'RUNNING' || campaign.status === 'SCHEDULED'
+        const canPause = canManage && (campaign.status === 'RUNNING' || campaign.status === 'SCHEDULED')
+        const totalContacts = campaign.stats?.totalMessages ?? 0
 
         return (
           <div key={campaign.id} className="rounded-xl border bg-white p-5 shadow-sm">
@@ -76,10 +74,15 @@ export default function CampaignList({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                  <span>Type: <strong className="text-gray-700">{campaign.type}</strong></span>
+                  <span>
+                    Type: <strong className="text-gray-700">{campaign.type}</strong>
+                  </span>
                   <span className="inline-flex items-center gap-1">
                     <Calendar size={14} />
                     {formatDate(campaign.scheduledAt)}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                    {totalContacts} contacts
                   </span>
                 </div>
 
@@ -91,11 +94,6 @@ export default function CampaignList({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {canLaunch && (
-                  <Button loading={launchingId === campaign.id} icon={<Play size={16} />} onClick={() => onLaunch(campaign)}>
-                    Lancer
-                  </Button>
-                )}
                 {canPause && (
                   <Button
                     variant="secondary"
@@ -107,10 +105,16 @@ export default function CampaignList({
                   </Button>
                 )}
                 <Button variant="ghost" icon={<RotateCcw size={16} />} onClick={onRefresh}>
-                  Rafraîchir
+                  Rafraichir
                 </Button>
               </div>
             </div>
+
+            {!canManage && (
+              <p className="mt-3 text-xs text-amber-700">
+                Lecture seule. La creation et la gestion des campagnes necessitent un role ADMIN ou SUPER_ADMIN.
+              </p>
+            )}
 
             <div className="mt-4">
               <CampaignStats stats={campaign.stats} />

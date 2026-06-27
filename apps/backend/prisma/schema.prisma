@@ -333,14 +333,16 @@ model Campaign {
 model CampaignMessage {
   id          String        @id @default(uuid())
   campaignId  String
-  patientId   String
+  patientId   String?
+  phone       String?
+  contactName String?
   status      MessageStatus @default(PENDING)
   deliveredAt DateTime?
   externalRef String?
   createdAt   DateTime      @default(now())
 
   campaign Campaign @relation(fields: [campaignId], references: [id])
-  patient  Patient  @relation(fields: [patientId], references: [id])
+  patient  Patient? @relation(fields: [patientId], references: [id])
 
   @@map("campaign_messages")
 }

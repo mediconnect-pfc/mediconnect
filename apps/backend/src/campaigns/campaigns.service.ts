@@ -5,12 +5,82 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { CAMPAIGN_JOB_NAME, CAMPAIGN_QUEUE, CampaignJobData } from './campaign.constants';
 
+type CampaignContact = {
+  phone: string;
+  name?: string | null;
+  patientId?: string | null;
+};
+
 @Injectable()
 export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(CAMPAIGN_QUEUE) private readonly queue: Queue,
   ) {}
+
+  private normalizePhone(value?: string | null) {
+    return value?.trim() ?? '';
+  }
+
+  private normalizeName(value?: string | null) {
+    const trimmed = value?.trim() ?? '';
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private async enqueueCampaignMessages(params: {
+    campaignId: string;
+    contacts: CampaignContact[];
+    campaignMessage: string;
+    campaignType: CampaignType;
+    delay?: number;
+  }) {
+    const { campaignId, contacts, campaignMessage, campaignType, delay = 0 } = params;
+
+    if (contacts.length === 0) {
+      return [];
+    }
+
+    const createdMessages = await this.prisma.$transaction(
+      contacts.map((contact) =>
+        this.prisma.campaignMessage.create({
+          data: {
+            campaignId,
+            patientId: contact.patientId ?? null,
+            phone: this.normalizePhone(contact.phone),
+            contactName: this.normalizeName(contact.name),
+            status: MessageStatus.PENDING,
+          },
+        }),
+      ),
+    );
+
+    await Promise.all(
+      createdMessages.map((message, index) =>
+        this.queue.add(
+          CAMPAIGN_JOB_NAME,
+          {
+            campaignId,
+            campaignMessageId: message.id,
+            patientId: message.patientId ?? undefined,
+            phone: message.phone ?? contacts[index]?.phone ?? '',
+            name: message.contactName ?? contacts[index]?.name ?? null,
+            message: campaignMessage,
+            type: campaignType,
+          } satisfies CampaignJobData,
+          {
+            jobId: `campaign-${message.id}`,
+            delay,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 15_000 },
+            removeOnComplete: true,
+            removeOnFail: false,
+          },
+        ),
+      ),
+    );
+
+    return createdMessages;
+  }
 
   async create(establishmentId: string, data: {
     name: string;
@@ -69,6 +139,14 @@ export class CampaignsService {
   async launch(establishmentId: string, id: string) {
     const campaign = await this.prisma.campaign.findFirst({
       where: { id, establishmentId },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        message: true,
+        scheduledAt: true,
+        segment: true,
+      },
     });
 
     if (!campaign) {
@@ -97,6 +175,8 @@ export class CampaignsService {
       },
       select: {
         id: true,
+        firstName: true,
+        lastName: true,
         phone: true,
       },
       orderBy: { createdAt: 'asc' },
@@ -120,17 +200,11 @@ export class CampaignsService {
       });
     }
 
-    const createdMessages = await this.prisma.$transaction(
-      patients.map((patient) =>
-        this.prisma.campaignMessage.create({
-          data: {
-            campaignId: campaign.id,
-            patientId: patient.id,
-            status: MessageStatus.PENDING,
-          },
-        }),
-      ),
-    );
+    const contacts = patients.map((patient) => ({
+      phone: patient.phone,
+      name: `${patient.firstName} ${patient.lastName}`.trim(),
+      patientId: patient.id,
+    }));
 
     await this.prisma.campaign.update({
       where: { id: campaign.id },
@@ -140,30 +214,102 @@ export class CampaignsService {
       },
     });
 
-    await Promise.all(
-      createdMessages.map((message) =>
-        this.queue.add(
-          CAMPAIGN_JOB_NAME,
-          {
-            campaignId: campaign.id,
-            campaignMessageId: message.id,
-            patientId: message.patientId,
-          } satisfies CampaignJobData,
-          {
-            jobId: `campaign:${message.id}`,
-            delay,
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 15_000 },
-            removeOnComplete: true,
-            removeOnFail: false,
-          },
-        ),
-      ),
-    );
+    await this.enqueueCampaignMessages({
+      campaignId: campaign.id,
+      contacts,
+      campaignMessage: campaign.message ?? '',
+      campaignType: campaign.type,
+      delay,
+    });
 
     return this.prisma.campaign.findUnique({
       where: { id: campaign.id },
     });
+  }
+
+  async parseCsvContacts(buffer: Buffer): Promise<Array<{ phone: string; name?: string }>> {
+    const { parse } = await import('csv-parse/sync');
+    const records = parse(buffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    return records
+      .filter((row: any) => row.phone?.trim())
+      .map((row: any) => ({
+        phone: row.phone.trim(),
+        name: row.name?.trim() ?? '',
+      }));
+  }
+
+  async launchWithContacts(
+    campaignId: string,
+    establishmentId: string,
+    contacts: Array<{ phone: string; name?: string }>,
+  ): Promise<{ status: string; totalContacts: number }> {
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, establishmentId },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        message: true,
+        scheduledAt: true,
+      },
+    });
+
+    if (!campaign) {
+      throw new NotFoundException('Campagne non trouvée');
+    }
+
+    if (campaign.status === CampaignStatus.RUNNING) {
+      throw new BadRequestException('Campagne déjà en cours');
+    }
+
+    if (campaign.status === CampaignStatus.COMPLETED) {
+      throw new BadRequestException('Campagne déjà terminée');
+    }
+
+    const validContacts = contacts
+      .map((contact) => ({
+        phone: this.normalizePhone(contact.phone),
+        name: this.normalizeName(contact.name),
+      }))
+      .filter((contact) => contact.phone.length > 0);
+
+    if (validContacts.length === 0) {
+      throw new BadRequestException('Aucun contact valide dans le fichier CSV');
+    }
+
+    const launchAt =
+      campaign.type === CampaignType.EMERGENCY
+        ? new Date()
+        : campaign.scheduledAt && campaign.scheduledAt > new Date()
+          ? campaign.scheduledAt
+          : new Date();
+    const delay = Math.max(launchAt.getTime() - Date.now(), 0);
+
+    await this.prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        status: CampaignStatus.RUNNING,
+        completedAt: null,
+      },
+    });
+
+    await this.enqueueCampaignMessages({
+      campaignId,
+      contacts: validContacts,
+      campaignMessage: campaign.message ?? '',
+      campaignType: campaign.type,
+      delay,
+    });
+
+    return {
+      status: CampaignStatus.RUNNING,
+      totalContacts: validContacts.length,
+    };
   }
 
   async pause(establishmentId: string, id: string) {
@@ -212,7 +358,10 @@ export class CampaignsService {
 
   async completeCampaignIfDone(campaignId: string) {
     const pendingCount = await this.prisma.campaignMessage.count({
-      where: { campaignId, status: MessageStatus.PENDING },
+      where: {
+        campaignId,
+        status: { in: [MessageStatus.PENDING, MessageStatus.SENT] },
+      },
     });
 
     if (pendingCount > 0) {

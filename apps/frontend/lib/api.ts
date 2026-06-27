@@ -108,3 +108,23 @@ export async function pauseCampaign(token: string, id: string) {
 
   return res.json()
 }
+
+export async function launchCampaignWithCsv(token: string, id: string, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns/${id}/launch-with-csv`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur lancement campagne CSV')
+  }
+
+  return res.json()
+}

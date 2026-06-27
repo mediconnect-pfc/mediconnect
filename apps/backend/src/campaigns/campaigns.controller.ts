@@ -11,7 +11,10 @@ import {
   Post,
   Query,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CampaignStatus, CampaignType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -76,6 +79,21 @@ export class CampaignsController {
     }
 
     return this.campaignsService.launch(this.getEstablishmentId(user), id);
+  }
+
+  @Post(':id/launch-with-csv')
+  @UseInterceptors(FileInterceptor('file'))
+  async launchWithCsv(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @UploadedFile() file: { buffer: Buffer },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Fichier CSV requis');
+    }
+
+    const contacts = await this.campaignsService.parseCsvContacts(file.buffer);
+    return this.campaignsService.launchWithContacts(id, this.getEstablishmentId(user), contacts);
   }
 
   @Patch(':id/pause')

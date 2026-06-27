@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { CampaignStatus, CampaignType, MessageStatus } from '@prisma/client';
+import { CampaignStatus, MessageStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GomobileApiError, GomobileService } from '../notifications/gomobile.service';
 import { CAMPAIGN_QUEUE, CampaignJobData } from './campaign.constants';
@@ -20,24 +20,17 @@ export class CampaignProcessor extends WorkerHost {
   }
 
   async process(job: Job<CampaignJobData>): Promise<void> {
-    const { campaignId, campaignMessageId, patientId } = job.data;
+    const { campaignId, campaignMessageId, phone, name, message, type } = job.data;
 
     const campaignMessage = await this.prisma.campaignMessage.findUnique({
       where: { id: campaignMessageId },
       include: {
         campaign: true,
-        patient: { select: { id: true, firstName: true, lastName: true, phone: true, deletedAt: true } },
       },
     });
 
     if (!campaignMessage) {
       this.logger.warn(`Campaign message ${campaignMessageId} not found`);
-      return;
-    }
-
-    if (!campaignMessage.patient || campaignMessage.patient.deletedAt) {
-      await this.campaignsService.markMessageFailed(campaignMessageId);
-      await this.campaignsService.completeCampaignIfDone(campaignId);
       return;
     }
 
@@ -49,37 +42,45 @@ export class CampaignProcessor extends WorkerHost {
       return;
     }
 
-    if (!campaignMessage.patient.phone?.trim()) {
+    const targetPhone = phone?.trim() || campaignMessage.phone?.trim() || '';
+    const targetName = name?.trim() || campaignMessage.contactName?.trim() || 'Patient';
+
+    if (!targetPhone) {
       await this.campaignsService.markMessageFailed(campaignMessageId);
       await this.campaignsService.completeCampaignIfDone(campaignId);
       return;
     }
 
     try {
-      if (campaignMessage.campaign.type === CampaignType.VOICE) {
+      if (type === 'VOICE') {
         const result = await this.gomobile.triggerCallByPhone({
-          phone: campaignMessage.patient.phone,
-          fullName: `${campaignMessage.patient.firstName} ${campaignMessage.patient.lastName}`.trim(),
+          phone: targetPhone,
+          fullName: targetName,
           attributes: {
-            campaignId,
-            campaignMessageId,
-            patientId,
-            campaignName: campaignMessage.campaign.name,
-            campaignType: campaignMessage.campaign.type,
+            patientName: targetName,
+            message,
           },
         });
 
-        await this.campaignsService.markMessageSent(campaignMessageId, result.jobId);
+        await this.prisma.campaignMessage.update({
+          where: { id: campaignMessageId },
+          data: {
+            status: MessageStatus.DELIVERED,
+            deliveredAt: new Date(),
+            externalRef: result.jobId ?? `sent_${Date.now()}`,
+          },
+        });
       } else {
-        const result = await this.gomobile.sendSms(
-          campaignMessage.patient.phone,
-          campaignMessage.campaign.message ?? '',
-        );
+        const result = await this.gomobile.sendSms(targetPhone, message);
 
-        await this.campaignsService.markMessageDelivered(
-          campaignMessageId,
-          result.smsLogId ?? result.messageId,
-        );
+        await this.prisma.campaignMessage.update({
+          where: { id: campaignMessageId },
+          data: {
+            status: MessageStatus.DELIVERED,
+            deliveredAt: new Date(),
+            externalRef: result.smsLogId ?? result.messageId ?? `sent_${Date.now()}`,
+          },
+        });
       }
 
       await this.campaignsService.completeCampaignIfDone(campaignId);
