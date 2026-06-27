@@ -91,7 +91,7 @@ export function usePatients() {
     }
   }, [])
 
-  const importCSV = useCallback(async (file: File): Promise<boolean> => {
+  const importCSV = useCallback(async (file: File): Promise<{ success: boolean; result?: any; error?: string }> => {
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -101,9 +101,13 @@ export function usePatients() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       })
-      return res.ok
+      const body = await res.json().catch(() => null)
+      if (!res.ok) {
+        return { success: false, error: body?.message || `Erreur ${res.status}` }
+      }
+      return { success: true, result: body }
     } catch {
-      return false
+      return { success: false, error: 'Erreur de connexion au serveur' }
     }
   }, [])
 

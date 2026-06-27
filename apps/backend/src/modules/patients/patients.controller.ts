@@ -9,12 +9,14 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PatientsService } from './patients.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -22,6 +24,8 @@ import { createPatientSchema } from './dto/create-patient.dto';
 import { updatePatientSchema } from './dto/update-patient.dto';
 import type { Request } from 'express';
 import * as csv from 'csv-parse/sync';
+import PDFDocument from 'pdfkit';
+import { stringify } from 'csv-stringify';
 
 interface AuthUser {
   id: string;
@@ -148,5 +152,76 @@ export class PatientsController {
   @Get(':id/portal-token')
   generatePortalToken(@Req() req: Request, @Param('id') id: string) {
     return this.service.generatePortalToken(id, this.getEstId(req));
+  }
+
+  @Get('export/pdf')
+  async exportPdf(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!startDate || !endDate) throw new BadRequestException('startDate et endDate requis (YYYY-MM-DD)');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new BadRequestException('Format startDate invalide');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new BadRequestException('Format endDate invalide');
+
+    const estabId = this.getEstId(req);
+    const patients = await this.service.findAll(estabId, 1, 1000);
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="patients-${startDate}-${endDate}.pdf"`);
+    doc.pipe(res);
+
+    doc.fontSize(18).font('Helvetica-Bold').text('Export Patients', { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text(`Période: ${startDate} → ${endDate}`, { align: 'center' });
+    doc.moveDown();
+
+    const headers = ['Nom', 'Téléphone', 'Email', 'Statut'];
+    const colX = [40, 180, 300, 430];
+
+    doc.fontSize(10).font('Helvetica-Bold');
+    headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { width: 130 }));
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(552, doc.y).strokeColor('#ccc').stroke();
+    doc.moveDown(0.5);
+
+    doc.font('Helvetica').fontSize(9);
+    for (const p of (patients.data || patients)) {
+      const yStart = doc.y;
+      const row = [`${p.firstName} ${p.lastName}`, p.phone, p.email || '—', p.status || '—'];
+      row.forEach((val, i) => doc.text(val, colX[i], yStart, { width: 130 }));
+      doc.moveDown(0.8);
+      if (doc.y > 720) doc.addPage();
+    }
+
+    doc.fontSize(8).fillColor('#999');
+    doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, 40, doc.page.height - 40, { align: 'center' });
+    doc.end();
+  }
+
+  @Get('export/csv')
+  async exportCsv(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!startDate || !endDate) throw new BadRequestException('startDate et endDate requis (YYYY-MM-DD)');
+
+    const estabId = this.getEstId(req);
+    const patients = await this.service.findAll(estabId, 1, 1000);
+    const list = patients.data || patients;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="patients-${startDate}-${endDate}.csv"`);
+
+    const stringifier = stringify({ header: true, columns: ['firstName', 'lastName', 'phone', 'email', 'birthDate', 'status', 'tags'], delimiter: ';' });
+    stringifier.pipe(res);
+
+    for (const p of list) {
+      stringifier.write([p.firstName, p.lastName, p.phone, p.email || '', p.birthDate || '', p.status || '', (p.tags || []).join(', ')]);
+    }
+    stringifier.end();
   }
 }
