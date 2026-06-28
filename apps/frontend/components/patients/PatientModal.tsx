@@ -28,7 +28,7 @@ const statusOptions = [
   { value: 'NO_SHOW', label: 'No-show' },
 ]
 
-const phoneRegex = /^(?:\+?[1-9]\d{7,14}|0\d{9})$/
+const phoneRegex = /^\+212\d{9}$/
 
 export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
   const [form, setForm] = useState<PatientFormData>({
@@ -127,7 +127,7 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
               .replace(/[^\d+]/g, '')
               .replace(/(?!^)\+/g, '')
               .slice(0, 16)
-            set('phone', cleaned)
+            set('phone', cleaned.startsWith('+212') ? cleaned : cleaned)
           }}
           error={errors.phone}
         />

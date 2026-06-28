@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Pause, RotateCcw } from 'lucide-react'
+import { Calendar, Plus, Pause, RotateCcw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import CampaignStats from './CampaignStats'
@@ -11,15 +11,19 @@ interface CampaignListProps {
   loading?: boolean
   onPause: (campaign: Campaign) => Promise<void> | void
   onRefresh: () => void
+  onCreate?: () => void
   pausingId?: string | null
   canManage?: boolean
 }
 
-const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info'; className?: string }> = {
+const statusMap: Record<
+  string,
+  { label: string; variant: 'success' | 'warning' | 'danger' | 'info'; className?: string }
+> = {
   DRAFT: { label: 'Brouillon', variant: 'info' },
-  SCHEDULED: { label: 'Planifiee', variant: 'warning' },
+  SCHEDULED: { label: 'Planifié', variant: 'warning' },
   RUNNING: { label: 'En cours', variant: 'info', className: 'bg-blue-100 text-blue-700' },
-  COMPLETED: { label: 'Terminee', variant: 'success' },
+  COMPLETED: { label: 'Terminé', variant: 'success' },
   PAUSED: { label: 'En pause', variant: 'warning' },
 }
 
@@ -30,26 +34,59 @@ function formatDate(value?: string | null) {
   return date.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function LoadingCard() {
+  return (
+    <div className="rounded-xl border bg-white p-5 shadow-sm">
+      <div className="animate-pulse space-y-4">
+        <div className="h-5 w-2/5 rounded bg-gray-200" />
+        <div className="flex gap-2">
+          <div className="h-6 w-20 rounded-full bg-gray-200" />
+          <div className="h-6 w-28 rounded-full bg-gray-100" />
+        </div>
+        <div className="h-4 w-3/5 rounded bg-gray-100" />
+        <div className="h-32 rounded-xl bg-gray-100" />
+      </div>
+    </div>
+  )
+}
+
 export default function CampaignList({
   campaigns,
   loading,
   onPause,
   onRefresh,
+  onCreate,
   pausingId,
   canManage = true,
 }: CampaignListProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
-        Chargement...
+      <div className="grid gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <LoadingCard key={`campaign-loading-${index}`} />
+        ))}
       </div>
     )
   }
 
   if (!campaigns.length) {
     return (
-      <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
-        Aucune campagne.
+      <div className="rounded-xl border bg-white p-10 text-center text-gray-500 shadow-sm">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+          <Plus size={24} />
+        </div>
+        <p className="text-base font-medium text-gray-900">Aucune campagne.</p>
+        <p className="mt-1 text-sm text-gray-500">Créez votre première campagne pour démarrer.</p>
+        <div className="mt-4 flex justify-center gap-2">
+          {onCreate && (
+            <Button onClick={onCreate} icon={<Plus size={16} />} disabled={!canManage}>
+              Nouvelle campagne
+            </Button>
+          )}
+          <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={onRefresh}>
+            Rafraîchir
+          </Button>
+        </div>
       </div>
     )
   }
@@ -105,14 +142,14 @@ export default function CampaignList({
                   </Button>
                 )}
                 <Button variant="ghost" icon={<RotateCcw size={16} />} onClick={onRefresh}>
-                  Rafraichir
+                  Rafraîchir
                 </Button>
               </div>
             </div>
 
             {!canManage && (
               <p className="mt-3 text-xs text-amber-700">
-                Lecture seule. La creation et la gestion des campagnes necessitent un role ADMIN ou SUPER_ADMIN.
+                Lecture seule. La création et la gestion des campagnes nécessitent un rôle ADMIN ou SUPER_ADMIN.
               </p>
             )}
 

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Calendar, Check, Clock, Copy, Link2, Plus, RefreshCw, X } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { API_URL, authHeaders, getAuthToken, handleAuthResponse } from '@/lib/api'
+import { toast } from '@/components/ui'
+import Button from '@/components/ui/Button'
 
 type AppointmentStatus = 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
 
@@ -30,15 +32,36 @@ interface DoctorOption {
 }
 
 const statusConfig: Record<AppointmentStatus, { label: string; className: string }> = {
-  SCHEDULED: { label: 'En attente', className: 'bg-slate-100 text-slate-600' },
+  SCHEDULED: { label: 'Planifié', className: 'bg-slate-100 text-slate-700' },
   CONFIRMED: { label: 'Confirmé', className: 'bg-green-100 text-green-700' },
-  COMPLETED: { label: 'Terminé', className: 'bg-sky-100 text-sky-700' },
+  COMPLETED: { label: 'Terminé', className: 'bg-blue-100 text-blue-700' },
   CANCELLED: { label: 'Annulé', className: 'bg-red-100 text-red-700' },
-  NO_SHOW: { label: 'No-show', className: 'bg-amber-100 text-amber-700' },
+  NO_SHOW: { label: 'Absent', className: 'bg-amber-100 text-amber-700' },
 }
 
 function todayValue() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function LoadingRow() {
+  return (
+    <div className="animate-pulse border-b px-4 py-4 sm:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-4 w-14 rounded bg-gray-200" />
+          <div>
+            <div className="h-4 w-48 rounded bg-gray-200" />
+            <div className="mt-2 h-3 w-32 rounded bg-gray-100" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-20 rounded-full bg-gray-200" />
+          <div className="h-7 w-20 rounded-full bg-gray-200" />
+          <div className="h-7 w-20 rounded-full bg-gray-200" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function AppointmentsPage() {
@@ -130,6 +153,10 @@ export default function AppointmentsPage() {
       return
     }
 
+    toast({
+      type: action === 'confirm' ? 'success' : 'warning',
+      message: action === 'confirm' ? 'Rendez-vous confirmé' : 'Rendez-vous annulé',
+    })
     fetchAppointments()
   }
 
@@ -166,6 +193,7 @@ export default function AppointmentsPage() {
       setForm({ patientId: '', doctorId: '', date: form.date, time: '09:00' })
       setFilterDate(form.date)
       if (created.portalLink) setCreatedPortalLink(created.portalLink)
+      toast({ type: 'success', message: 'Rendez-vous créé avec succès' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur création RDV')
     } finally {
@@ -173,16 +201,18 @@ export default function AppointmentsPage() {
     }
   }
 
+  const isEmpty = !loading && appointments.length === 0
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Planning du Jour</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Planning du Jour</h1>
           <p className="mt-1 text-sm capitalize text-gray-500">{selectedDateLabel}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f1f3d] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#172b52]"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
           <Plus size={16} /> Nouveau RDV
         </button>
@@ -208,7 +238,10 @@ export default function AppointmentsPage() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           />
           <button
-            onClick={() => { setFilterDoctorId(''); setFilterDate(todayValue()) }}
+            onClick={() => {
+              setFilterDoctorId('')
+              setFilterDate(todayValue())
+            }}
             className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800"
           >
             <RefreshCw size={14} /> Réinitialiser
@@ -268,7 +301,7 @@ export default function AppointmentsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? 'Création...' : 'Créer le RDV'}
             </button>
@@ -305,14 +338,18 @@ export default function AppointmentsPage() {
 
       <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
         {loading ? (
-          <div className="flex flex-col items-center justify-center px-6 py-12 text-gray-400">
-            <Clock size={32} className="mb-3" />
-            <p>Chargement...</p>
+          <div>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <LoadingRow key={`loading-row-${index}`} />
+            ))}
           </div>
-        ) : appointments.length === 0 ? (
+        ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center px-6 py-12 text-gray-400">
             <Calendar size={32} className="mb-3" />
-            <p>Aucun rendez-vous pour cette date</p>
+            <p className="text-gray-500">Aucun rendez-vous aujourd&apos;hui.</p>
+            <Button className="mt-4" onClick={() => setShowForm(true)} icon={<Plus size={16} />}>
+              Nouveau RDV
+            </Button>
           </div>
         ) : (
           appointments.map((appointment, index) => {

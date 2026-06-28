@@ -110,7 +110,7 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campagnes</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Campagnes</h1>
           <p className="mt-1 text-sm text-gray-500">SMS, appels vocaux et campagnes d'urgence</p>
         </div>
         <div className="flex gap-2">
@@ -144,6 +144,7 @@ export default function CampaignsPage() {
         loading={loading}
         onPause={handlePause}
         onRefresh={refreshCampaigns}
+        onCreate={() => setCreateOpen(true)}
         pausingId={pausingId}
         canManage={canManageCampaigns}
       />

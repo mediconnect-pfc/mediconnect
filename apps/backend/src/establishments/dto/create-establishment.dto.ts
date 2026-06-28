@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 import { EstabType, PlanType } from '@prisma/client';
 
 export class CreateEstablishmentDto {
@@ -19,4 +19,8 @@ export class CreateEstablishmentDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @IsObject()
+  @IsOptional()
+  settings?: Record<string, unknown>;
 }

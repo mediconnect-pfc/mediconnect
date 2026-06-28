@@ -19,17 +19,17 @@ export function toast(config: ToastConfig) {
 }
 
 const icons: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle size={18} className="text-green-500" />,
-  error: <AlertCircle size={18} className="text-red-500" />,
-  info: <Info size={18} className="text-blue-500" />,
-  warning: <AlertTriangle size={18} className="text-yellow-500" />,
+  success: <CheckCircle size={18} className="text-green-600" />,
+  error: <AlertCircle size={18} className="text-red-600" />,
+  info: <Info size={18} className="text-blue-600" />,
+  warning: <AlertTriangle size={18} className="text-orange-600" />,
 }
 
 const bgColors: Record<ToastType, string> = {
   success: 'border-green-200 bg-green-50',
   error: 'border-red-200 bg-red-50',
   info: 'border-blue-200 bg-blue-50',
-  warning: 'border-yellow-200 bg-yellow-50',
+  warning: 'border-orange-200 bg-orange-50',
 }
 
 interface ToastItem {
@@ -50,15 +50,17 @@ export default function ToastContainer() {
       setTimeout(() => {
         setItems((prev) => prev.filter((t) => t.id !== id))
         config.onClose?.()
-      }, config.duration || 4000)
+      }, config.duration ?? 3000)
     }
-    return () => { toastFn = null }
+    return () => {
+      toastFn = null
+    }
   }, [])
 
   if (items.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <div className="fixed right-4 top-4 z-50 flex flex-col gap-2">
       {items.map((item) => (
         <div
           key={item.id}
@@ -69,6 +71,7 @@ export default function ToastContainer() {
           <button
             onClick={() => setItems((prev) => prev.filter((t) => t.id !== item.id))}
             className="ml-auto text-gray-400 hover:text-gray-600"
+            aria-label="Fermer"
           >
             <X size={16} />
           </button>

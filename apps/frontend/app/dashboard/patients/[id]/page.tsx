@@ -245,7 +245,7 @@ export default function PatientDetailPage() {
             {patient.firstName.charAt(0)}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{fullName}</h1>
             <Badge variant={statusVariant[patient.status || 'ACTIF']}>
               {patient.status === 'ACTIF' ? 'Actif' : patient.status === 'PENDING' ? 'En attente' : 'No-show'}
             </Badge>

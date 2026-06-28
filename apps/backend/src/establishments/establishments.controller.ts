@@ -7,7 +7,6 @@ import {
   Param,
   Body,
   UseGuards,
-  Req,
   HttpCode,
   HttpStatus,
   ForbiddenException,
@@ -16,53 +15,72 @@ import { EstablishmentsService } from './establishments.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import type { Request } from 'express';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { UserRole } from '@prisma/client';
 
 interface AuthUser {
   id: string;
   role: string;
+  establishmentId?: string | null;
 }
 
 @Controller('establishments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EstablishmentsController {
   constructor(private readonly service: EstablishmentsService) {}
 
-  private requireSuperAdmin(req: Request): void {
-    const user = (req as any).user as AuthUser;
-    if (user.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Accès réservé aux super administrateurs');
+  private requireAdminOrSuperAdmin(user: AuthUser): void {
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('AccÃ¨s rÃ©servÃ© aux administrateurs');
+    }
+  }
+
+  private requireOwnerOrSuperAdmin(user: AuthUser, establishmentId: string): void {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      return;
+    }
+
+    this.requireAdminOrSuperAdmin(user);
+
+    if (!user.establishmentId || user.establishmentId !== establishmentId) {
+      throw new ForbiddenException('AccÃ¨s refusÃ©');
     }
   }
 
   @Get()
-  findAll(@Req() req: Request) {
-    this.requireSuperAdmin(req);
+  @Roles(UserRole.SUPER_ADMIN)
+  findAll(@CurrentUser() user: AuthUser) {
+    this.requireAdminOrSuperAdmin(user);
     return this.service.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    this.requireOwnerOrSuperAdmin(user, id);
     return this.service.findOne(id);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Req() req: Request, @Body() dto: CreateEstablishmentDto) {
-    this.requireSuperAdmin(req);
+  @Roles(UserRole.SUPER_ADMIN)
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateEstablishmentDto) {
+    this.requireAdminOrSuperAdmin(user);
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateEstablishmentDto) {
-    this.requireSuperAdmin(req);
+  update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateEstablishmentDto) {
+    this.requireOwnerOrSuperAdmin(user, id);
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  deactivate(@Req() req: Request, @Param('id') id: string) {
-    this.requireSuperAdmin(req);
+  @Roles(UserRole.SUPER_ADMIN)
+  deactivate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    this.requireAdminOrSuperAdmin(user);
     return this.service.deactivate(id);
   }
 }

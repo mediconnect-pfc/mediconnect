@@ -53,7 +53,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-semibold text-gray-900">
         Bienvenue, {user?.name || 'Utilisateur'}
       </h1>
 

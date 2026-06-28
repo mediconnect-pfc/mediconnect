@@ -22,7 +22,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DashboardRealtimeProvider>
-      <DashboardContent user={user} logout={logout}>{children}</DashboardContent>
+      <DashboardContent user={user} logout={logout}>
+        {children}
+      </DashboardContent>
     </DashboardRealtimeProvider>
   )
 }
@@ -47,7 +49,7 @@ function DashboardContent({
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="flex flex-1 flex-col lg:ml-64">
+      <div className="flex flex-1 flex-col md:ml-64">
         <Topbar
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
           notificationCount={notificationCount}

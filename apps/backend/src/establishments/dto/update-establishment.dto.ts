@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsEnum, IsNotEmpty, IsOptional, IsBoolean, IsObject } from 'class-validator';
 import { EstabType, PlanType } from '@prisma/client';
 
 export class UpdateEstablishmentDto {
@@ -27,4 +27,8 @@ export class UpdateEstablishmentDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsObject()
+  @IsOptional()
+  settings?: Record<string, unknown>;
 }

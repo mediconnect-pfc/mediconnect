@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
@@ -22,12 +23,25 @@ export class EstablishmentsService {
   }
 
   create(dto: CreateEstablishmentDto) {
-    return this.prisma.establishment.create({ data: dto });
+    const { settings, ...rest } = dto;
+    return this.prisma.establishment.create({
+      data: {
+        ...rest,
+        settings: settings as Prisma.InputJsonValue | undefined,
+      },
+    });
   }
 
   async update(id: string, dto: UpdateEstablishmentDto) {
     await this.findOne(id);
-    return this.prisma.establishment.update({ where: { id }, data: dto });
+    const { settings, ...rest } = dto;
+    return this.prisma.establishment.update({
+      where: { id },
+      data: {
+        ...rest,
+        settings: settings as Prisma.InputJsonValue | undefined,
+      },
+    });
   }
 
   async deactivate(id: string) {

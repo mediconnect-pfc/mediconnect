@@ -62,6 +62,94 @@ export interface DossierUpdateInput {
   ordonnance?: string
 }
 
+export interface EstablishmentInput {
+  name?: string
+  type?: 'CLINIC' | 'HOSPITAL' | 'PHARMACY'
+  phone?: string
+  address?: string | null
+  settings?: any
+}
+
+export interface CreateUserInput {
+  name: string
+  email: string
+  password: string
+  role: 'DOCTOR' | 'RECEPTIONIST' | 'CAISSIER'
+  specialty?: string | null
+}
+
+export interface UpdateUserInput {
+  name?: string
+  email?: string
+  password?: string
+  role?: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST' | 'CAISSIER'
+  specialty?: string | null
+  isActive?: boolean
+}
+
+export async function getEstablishment(token: string, id: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/establishments/${id}`, {
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) throw new Error('Erreur chargement etablissement')
+  return res.json()
+}
+
+export async function updateEstablishment(token: string, id: string, data: EstablishmentInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/establishments/${id}`, {
+    method: 'PATCH',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur mise a jour etablissement')
+  }
+
+  return res.json()
+}
+
+export async function getUsers(token: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/users`, {
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) throw new Error('Erreur chargement utilisateurs')
+  return res.json()
+}
+
+export async function createUser(token: string, data: CreateUserInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/users`, {
+    method: 'POST',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur creation utilisateur')
+  }
+
+  return res.json()
+}
+
+export async function updateUser(token: string, id: string, data: UpdateUserInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/users/${id}`, {
+    method: 'PATCH',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur mise a jour utilisateur')
+  }
+
+  return res.json()
+}
+
 export async function getCampaigns(token?: string) {
   const headers = token ? authHeadersWithToken(token) : authHeaders()
   const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns`, { headers }))

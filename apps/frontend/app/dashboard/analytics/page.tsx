@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">Tableau de bord analytique</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Tableau de bord analytique</h1>
           <p className="text-sm text-gray-500">Indicateurs de performance de votre clinique</p>
           {kpis && (
             <p className="text-xs text-gray-400">

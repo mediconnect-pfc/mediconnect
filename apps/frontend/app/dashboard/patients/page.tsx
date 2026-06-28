@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Upload, Search, ChevronDown } from 'lucide-react'
+import { ChevronDown, Plus, Search, Upload, Users } from 'lucide-react'
 import { usePatients } from '@/hooks/usePatients'
 import PatientModal from '@/components/patients/PatientModal'
 import ImportCSVModal from '@/components/patients/ImportCSVModal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Pagination from '@/components/ui/Pagination'
+import { toast } from '@/components/ui'
 
 const statusBadge: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
   ACTIF: 'success',
@@ -28,6 +29,35 @@ const filters = [
   { label: 'En attente', value: 'PENDING' },
   { label: 'No-shows', value: 'NO_SHOW' },
 ]
+
+function TableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <tr key={`patient-skeleton-${index}`} className="animate-pulse">
+          <td className="px-4 py-4 sm:px-6">
+            <div className="h-4 w-40 rounded bg-gray-200" />
+          </td>
+          <td className="px-4 py-4 sm:px-6">
+            <div className="h-4 w-32 rounded bg-gray-200" />
+          </td>
+          <td className="hidden px-4 py-4 sm:table-cell sm:px-6">
+            <div className="h-4 w-28 rounded bg-gray-200" />
+          </td>
+          <td className="hidden px-4 py-4 md:table-cell md:px-6">
+            <div className="h-4 w-28 rounded bg-gray-200" />
+          </td>
+          <td className="px-4 py-4 sm:px-6">
+            <div className="h-6 w-20 rounded-full bg-gray-200" />
+          </td>
+          <td className="px-4 py-4 text-right sm:px-6">
+            <div className="ml-auto h-4 w-10 rounded bg-gray-200" />
+          </td>
+        </tr>
+      ))}
+    </>
+  )
+}
 
 export default function PatientsPage() {
   const { patients, totalPages, loading, fetchPatients, createPatient, importCSV } = usePatients()
@@ -50,7 +80,15 @@ export default function PatientsPage() {
     fetchPatients(page, search, status)
   }, [page, fetchPatients, search, status])
 
-  async function handleCreate(data: { firstName: string; lastName: string; phone: string; email: string; birthDate: string; address: string; status?: string }) {
+  async function handleCreate(data: {
+    firstName: string
+    lastName: string
+    phone: string
+    email: string
+    birthDate: string
+    address: string
+    status?: string
+  }) {
     const { error } = await createPatient(data)
     if (error) return error
     fetchPatients(page, search, status)
@@ -61,7 +99,7 @@ export default function PatientsPage() {
     if (!success) throw new Error(error || 'Échec de l\'import')
     const imported = result?.imported ?? 0
     const total = result?.total ?? 0
-    const errs: string[] = (result?.errors ?? []).map((e: any) => `Ligne ${e.row}: ${e.message}`)
+    const errs: string[] = (result?.errors ?? []).map((entry: any) => `Ligne ${entry.row}: ${entry.message}`)
     const msg = [`${imported}/${total} importés`]
     if (errs.length) {
       msg.push('')
@@ -70,25 +108,35 @@ export default function PatientsPage() {
     }
     if (errs.length) throw new Error(msg.join('\n'))
     fetchPatients(page, search, status)
+    toast({
+      message: `Import CSV réussi : ${imported}/${total} patients importés`,
+      type: 'success',
+    })
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Patients</h1>
+          <p className="mt-1 text-sm text-gray-500">Gestion de la liste des patients de la clinique</p>
+        </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setImportOpen(true)}>
-            <Upload size={16} /> Importer CSV
+          <Button variant="secondary" onClick={() => setImportOpen(true)} icon={<Upload size={16} />}>
+            Importer CSV
           </Button>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus size={16} /> Nouveau patient
+          <Button onClick={() => setModalOpen(true)} icon={<Plus size={16} />}>
+            Nouveau patient
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
+          />
           <input
             type="text"
             placeholder="Rechercher par nom ou téléphone..."
@@ -109,7 +157,10 @@ export default function PatientsPage() {
               {filters.map((f) => (
                 <button
                   key={f.value}
-                  onClick={() => { setStatus(f.value); setShowFilters(false) }}
+                  onClick={() => {
+                    setStatus(f.value)
+                    setShowFilters(false)
+                  }}
                   className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
                     status === f.value ? 'font-medium text-blue-700' : 'text-gray-700'
                   }`}
@@ -136,12 +187,26 @@ export default function PatientsPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Chargement...</td>
-              </tr>
+              <TableSkeleton />
             ) : patients.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Aucun patient trouvé</td>
+                <td colSpan={6} className="px-6 py-12">
+                  <div className="flex flex-col items-center gap-3 text-center text-gray-500">
+                    <Users size={32} className="text-gray-300" />
+                    <div>
+                      <p className="font-medium text-gray-900">Aucun patient.</p>
+                      <p className="mt-1 text-sm text-gray-500">Ajoutez votre premier patient.</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Button onClick={() => setModalOpen(true)} icon={<Plus size={16} />}>
+                        Nouveau patient
+                      </Button>
+                      <Button variant="secondary" onClick={() => setImportOpen(true)} icon={<Upload size={16} />}>
+                        Importer CSV
+                      </Button>
+                    </div>
+                  </div>
+                </td>
               </tr>
             ) : (
               patients.map((p) => (

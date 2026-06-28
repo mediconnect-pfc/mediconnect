@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Menu, Search, Settings } from 'lucide-react'
 
@@ -10,12 +11,15 @@ interface TopbarProps {
 }
 
 const pageTitles: Record<string, string> = {
-  '/dashboard':                  'Dashboard',
-  '/dashboard/patients':         'Patients',
-  '/dashboard/clinics':          'Clinics',
-  '/dashboard/appointments':     'Appointments',
-  '/dashboard/financials':       'Financials',
-  '/dashboard/ia-monitoring':    'IA Monitoring',
+  '/dashboard': 'Dashboard',
+  '/dashboard/patients': 'Patients',
+  '/dashboard/analytics': 'Analytics',
+  '/dashboard/campaigns': 'Campagnes',
+  '/dashboard/clinics': 'Clinics',
+  '/dashboard/appointments': 'Appointments',
+  '/dashboard/financials': 'Financials',
+  '/dashboard/ia-monitoring': 'IA Monitoring',
+  '/dashboard/settings': 'Paramètres',
 }
 
 export default function Topbar({
@@ -38,7 +42,8 @@ export default function Topbar({
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleSidebar}
-          className="text-gray-500 hover:text-gray-700 lg:hidden"
+          className="text-gray-500 hover:text-gray-700 md:hidden"
+          aria-label="Ouvrir le menu"
         >
           <Menu size={22} />
         </button>
@@ -49,7 +54,6 @@ export default function Topbar({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Search */}
         <div className="hidden items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 sm:flex">
           <Search size={14} className="text-gray-400" />
           <input
@@ -59,7 +63,6 @@ export default function Topbar({
           />
         </div>
 
-        {/* Notifications */}
         <button
           onClick={onNotificationsClick}
           className="relative rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200"
@@ -73,12 +76,14 @@ export default function Topbar({
           )}
         </button>
 
-        {/* Settings */}
-        <button className="rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200">
+        <Link
+          href="/dashboard/settings"
+          className="rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200"
+          title="Paramètres"
+        >
           <Settings size={18} />
-        </button>
+        </Link>
 
-        {/* Avatar placeholder */}
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
           A
         </div>

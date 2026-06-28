@@ -89,7 +89,7 @@ export default function NewDossierPage() {
 
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Nouvelle consultation</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Nouvelle consultation</h1>
           <p className="mt-1 text-sm text-gray-500">
             Creez un dossier medical avec les notes de consultation et l&apos;ordonnance.
           </p>
