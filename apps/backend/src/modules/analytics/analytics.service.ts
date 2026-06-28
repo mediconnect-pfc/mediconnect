@@ -140,14 +140,19 @@ export class AnalyticsService {
             patient: { establishmentId, deletedAt: null },
           }
         : { slot: dateFilter },
-      select: { slot: true },
+      select: { slot: true, status: true },
       orderBy: { slot: 'asc' },
     });
 
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; confirmed: number; cancelled: number; noShow: number }>();
     for (const appointment of appointments) {
       const key = appointment.slot.toISOString().slice(0, 10);
-      map.set(key, (map.get(key) ?? 0) + 1);
+      const current = map.get(key) ?? { count: 0, confirmed: 0, cancelled: 0, noShow: 0 };
+      current.count += 1;
+      if (appointment.status === 'CONFIRMED') current.confirmed += 1;
+      if (appointment.status === 'CANCELLED') current.cancelled += 1;
+      if (appointment.status === 'NO_SHOW') current.noShow += 1;
+      map.set(key, current);
     }
 
     const data: AppointmentSeriesResponse['data'] = [];
@@ -156,7 +161,8 @@ export class AnalyticsService {
 
     while (cursor <= end) {
       const key = cursor.toISOString().slice(0, 10);
-      data.push({ date: key, count: map.get(key) ?? 0 });
+      const current = map.get(key) ?? { count: 0, confirmed: 0, cancelled: 0, noShow: 0 };
+      data.push({ date: key, ...current });
       cursor.setDate(cursor.getDate() + 1);
     }
 

@@ -22,6 +22,9 @@ export interface KpiResponse {
 export interface AppointmentSeriesPoint {
   date: string;
   count: number;
+  confirmed: number;
+  cancelled: number;
+  noShow: number;
 }
 
 export interface AppointmentSeriesResponse {

@@ -79,8 +79,8 @@ function appointmentActivity(event: AppointmentEvent, tone: ActivityItem['tone']
   return {
     id: `appointment-${event.appointmentId}-${event.status}-${Date.now()}`,
     type: 'appointment',
-    title: event.status === 'CONFIRMED' ? 'Rendez-vous confirmé' : 'Rendez-vous annulé',
-    description: `${name} - ${event.doctorName}`,
+    title: `${name} a ${event.status === 'CONFIRMED' ? 'confirmé' : 'annulé'} son RDV`,
+    description: event.doctorName ? `avec ${event.doctorName}` : '',
     createdAt: new Date().toISOString(),
     tone,
   }
@@ -91,8 +91,8 @@ function interactionActivity(event: InteractionEvent): ActivityItem {
   return {
     id: `interaction-${event.interactionId}`,
     type: 'interaction',
-    title: event.type === 'CALL' ? 'Nouvel appel' : 'Nouveau SMS',
-    description: event.transcript ? `${name}: ${event.transcript}` : name,
+    title: event.type === 'CALL' ? `Appel avec ${name}` : `SMS avec ${name}`,
+    description: event.intent ? `${event.intent}` : event.transcript || '',
     createdAt: event.createdAt,
     tone: 'info',
   }
