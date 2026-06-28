@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user.ty
 export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(AnalyticsGateway.name);
   private interval: ReturnType<typeof setInterval> | null = null;
+  private refreshing = false;
 
   @WebSocketServer() server!: Server;
 
@@ -29,14 +30,10 @@ export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection, OnG
 
   afterInit() {
     this.logger.log('WebSocket gateway initialized');
-    this.interval = setInterval(async () => {
-      try {
-        const kpis = await this.analyticsService.computeDashboardKpis();
-        this.server.emit('kpi_update', kpis);
-      } catch (err) {
-        this.logger.error('Failed to compute KPIs', err);
-      }
-    }, 5000);
+    void this.refreshGlobalKpis();
+    this.interval = setInterval(() => {
+      void this.refreshGlobalKpis();
+    }, 30000);
   }
 
   async handleConnection(client: Socket) {
@@ -62,5 +59,19 @@ export class AnalyticsGateway implements OnGatewayInit, OnGatewayConnection, OnG
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  private async refreshGlobalKpis() {
+    if (this.refreshing) return;
+    this.refreshing = true;
+
+    try {
+      const kpis = await this.analyticsService.computeDashboardKpis();
+      this.server.emit('kpi_update', kpis);
+    } catch (err) {
+      this.logger.error('Failed to compute KPIs', err);
+    } finally {
+      this.refreshing = false;
+    }
   }
 }

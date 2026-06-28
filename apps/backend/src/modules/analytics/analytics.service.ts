@@ -11,6 +11,7 @@ import {
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
   private readonly startTime = Date.now();
+  private readonly dashboardKpiLocks = new Map<string, Promise<KpiData>>();
 
   constructor(private prisma: PrismaService) {}
 
@@ -174,7 +175,22 @@ export class AnalyticsService {
   }
 
   async computeDashboardKpis(establishmentId?: string | null): Promise<KpiData> {
-    const now = new Date();
+    const key = establishmentId ?? '__global__';
+    const existing = this.dashboardKpiLocks.get(key);
+    if (existing) return existing;
+
+    const computation = this.computeDashboardKpisInternal(establishmentId).finally(() => {
+      this.dashboardKpiLocks.delete(key);
+    });
+
+    this.dashboardKpiLocks.set(key, computation);
+    return computation;
+  }
+
+  private async computeDashboardKpiWhere(
+    establishmentId?: string | null,
+    now = new Date(),
+  ) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const userWhere = establishmentId
@@ -195,6 +211,14 @@ export class AnalyticsService {
           campaign: { establishmentId },
         }
       : { createdAt: { gte: todayStart } };
+
+    return { now, userWhere, newUsersWhere, appointmentWhere, messageWhere };
+  }
+
+  private async computeDashboardKpisInternal(establishmentId?: string | null): Promise<KpiData> {
+    const now = new Date();
+    const { userWhere, newUsersWhere, appointmentWhere, messageWhere } =
+      await this.computeDashboardKpiWhere(establishmentId, now);
 
     const [
       totalUsers,
