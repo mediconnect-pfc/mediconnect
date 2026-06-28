@@ -12,7 +12,10 @@ function isAllowedOrigin(origin: string) {
 
   if (
     /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i.test(normalized) ||
-    /^https?:\/\/\[::1\](:\d+)?$/i.test(normalized)
+    /^https?:\/\/\[::1\](:\d+)?$/i.test(normalized) ||
+    /^https?:\/\/[^/]+\.trycloudflare\.com$/i.test(normalized) ||
+    /^https?:\/\/[^/]+\.ngrok-free\.app$/i.test(normalized) ||
+    /^https?:\/\/[^/]+\.ngrok\.app$/i.test(normalized)
   ) {
     return true;
   }

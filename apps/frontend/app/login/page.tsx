@@ -39,8 +39,12 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Email ou mot de passe incorrect')
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(
+          data?.message || 'Email ou mot de passe incorrect',
+        )
+      }
 
       localStorage.setItem('token', data.token)
       setCookie(data.token)

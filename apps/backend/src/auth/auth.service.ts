@@ -155,6 +155,11 @@ export class AuthService {
   }
 
   private frontendBaseUrl(): string {
-    return (this.config.get<string>('FRONTEND_URL') || 'http://localhost:3001').replace(/\/$/, '');
+    return (
+      this.config.get<string>('FRONTEND_URL') ||
+      this.config.get<string>('PUBLIC_FRONTEND_URL') ||
+      this.config.get<string>('NEXT_PUBLIC_FRONTEND_URL') ||
+      'http://localhost:3001'
+    ).replace(/\/$/, '');
   }
 }

@@ -14,22 +14,55 @@ import {
   Settings,
   LogOut,
   HelpCircle,
-  Plus,
   X,
+  Stethoscope,
 } from 'lucide-react'
 import type { User } from '@/types'
 
-const navItems = [
+type NavItem = {
+  label: string
+  href: string
+  icon: React.ComponentType<{ size?: number; className?: string }>
+  comingSoon?: boolean
+}
+
+const baseItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
   { label: 'Patients', href: '/dashboard/patients', icon: Users },
+]
+
+const doctorItems: NavItem[] = [
+  { label: 'Consultations', href: '/dashboard/dossiers', icon: Stethoscope },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+]
+
+const adminItems: NavItem[] = [
+  { label: 'Consultations', href: '/dashboard/dossiers', icon: Stethoscope },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Campagnes', href: '/dashboard/campaigns', icon: Megaphone },
-  { label: 'Paramètres', href: '/dashboard/settings', icon: Settings },
-  { label: 'Clinics', href: '/dashboard/clinics', icon: Building2 },
-  { label: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
-  { label: 'Financials', href: '/dashboard/financials', icon: CreditCard },
-  { label: 'IA Monitoring', href: '/dashboard/ia-monitoring', icon: Bot },
+  { label: 'Clinics', href: '/dashboard/clinics', icon: Building2, comingSoon: true },
+  { label: 'Financials', href: '/dashboard/financials', icon: CreditCard, comingSoon: true },
+  { label: 'IA Monitoring', href: '/dashboard/ia-monitoring', icon: Bot, comingSoon: true },
 ]
+
+const staffItems: NavItem[] = [
+  { label: 'Campagnes', href: '/dashboard/campaigns', icon: Megaphone },
+]
+
+const settingsItem: NavItem = { label: 'Paramètres', href: '/dashboard/settings', icon: Settings }
+
+function getNavItems(role: string): NavItem[] {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+    return [...baseItems, ...adminItems, settingsItem]
+  }
+
+  if (role === 'DOCTOR') {
+    return [...baseItems, ...doctorItems, settingsItem]
+  }
+
+  return [...baseItems, ...staffItems, settingsItem]
+}
 
 interface SidebarProps {
   user: User
@@ -40,8 +73,6 @@ interface SidebarProps {
 
 function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>) {
   const pathname = usePathname()
-  const canManageCampaigns = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-  const canManageSettings = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
 
   return (
     <div className="flex h-full w-64 flex-col bg-[#0f1f3d]">
@@ -61,36 +92,42 @@ function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>)
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-3">
-        {navItems
-          .filter((item) => item.href !== '/dashboard/campaigns' || canManageCampaigns)
-          .filter((item) => item.href !== '/dashboard/settings' || canManageSettings)
-          .map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-            return (
-              <Link key={href} href={href} onClick={onClose}>
-                <div
-                  className={`mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
-                    active
-                      ? 'bg-blue-600/80 font-medium text-white'
-                      : 'text-white/60 hover:bg-white/8 hover:text-white'
-                  }`}
-                >
-                  <Icon size={18} />
-                  {label}
-                </div>
-              </Link>
-            )
-          })}
+        {getNavItems(user.role).map(({ href, label, icon: Icon, comingSoon }) => {
+          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+          const itemClass = `mb-0.5 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
+            active
+              ? 'bg-blue-600/80 font-medium text-white'
+              : comingSoon
+                ? 'cursor-not-allowed text-white/35 hover:bg-white/5 hover:text-white/35'
+                : 'text-white/60 hover:bg-white/8 hover:text-white'
+          }`
 
-        <div className="mt-4">
-          <Link
-            href="/dashboard/dossiers/new"
-            onClick={onClose}
-            className="flex w-full items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            <Plus size={16} /> Nouvelle consultation
-          </Link>
-        </div>
+          const content = (
+            <div className={itemClass}>
+              <div className="flex items-center gap-3">
+                <Icon size={18} />
+                {label}
+              </div>
+              {comingSoon && (
+                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                  Bientôt
+                </span>
+              )}
+            </div>
+          )
+
+          return (
+            <div key={href}>
+              {comingSoon ? (
+                content
+              ) : (
+                <Link href={href} onClick={onClose}>
+                  {content}
+                </Link>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       <div className="border-t border-white/10 px-3 py-3">

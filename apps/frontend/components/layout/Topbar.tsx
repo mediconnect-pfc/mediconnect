@@ -13,6 +13,8 @@ interface TopbarProps {
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/dashboard/patients': 'Patients',
+  '/dashboard/dossiers': 'Consultations',
+  '/dashboard/dossiers/new': 'Nouvelle consultation',
   '/dashboard/analytics': 'Analytics',
   '/dashboard/campaigns': 'Campagnes',
   '/dashboard/clinics': 'Clinics',

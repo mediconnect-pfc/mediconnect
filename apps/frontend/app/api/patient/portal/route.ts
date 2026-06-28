@@ -1,4 +1,8 @@
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || ''
+const BACKEND_URL =
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  ''
 
 function jsonResponse(body: unknown, status: number) {
   return Response.json(body, { status })
