@@ -228,7 +228,7 @@ export class CampaignsService {
   }
 
   async parseCsvContacts(buffer: Buffer): Promise<Array<{ phone: string; name?: string }>> {
-    const { parse } = await import('csv-parse/sync');
+    const { parse } = require('csv-parse/sync');
     const records = parse(buffer, {
       columns: true,
       skip_empty_lines: true,

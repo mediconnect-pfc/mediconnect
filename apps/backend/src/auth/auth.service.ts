@@ -57,6 +57,10 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (user && !user.isActive) {
+      throw new UnauthorizedException('Compte inactif');
+    }
+
     if (user && (await bcrypt.compare(dto.password, user.password))) {
       const token = this.jwt.sign({ sub: user.id, email: user.email, type: 'user' });
       return {
