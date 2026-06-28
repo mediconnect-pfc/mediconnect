@@ -10,11 +10,22 @@ import { AppointmentStatus, InteractionType, UserRole } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 
-const allowedOrigins = [
-  'http://localhost:3001',
-  process.env.FRONTEND_URL,
-  process.env.PATIENT_PORTAL_URL,
-].filter(Boolean) as string[];
+const allowedOrigins = [process.env.FRONTEND_URL, process.env.PATIENT_PORTAL_URL]
+  .filter(Boolean)
+  .map((origin) => origin!.replace(/\/$/, '')) as string[];
+
+function isAllowedOrigin(origin: string) {
+  const normalized = origin.replace(/\/$/, '');
+
+  if (
+    /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i.test(normalized) ||
+    /^https?:\/\/\[::1\](:\d+)?$/i.test(normalized)
+  ) {
+    return true;
+  }
+
+  return allowedOrigins.includes(normalized);
+}
 
 interface JwtPayload {
   sub: string;
@@ -67,7 +78,13 @@ export interface InteractionRealtimePayload {
 
 @WebSocketGateway({
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
   },
 })

@@ -202,6 +202,12 @@ export default function CampaignModal({
   }
 
   const selectedType = campaignTypes.find((option) => option.value === type)
+  const messagePlaceholder =
+    type === 'SMS'
+      ? 'Ex: Bonjour, votre rendez-vous est confirme.'
+      : type === 'EMERGENCY'
+        ? 'Ex: Alerte urgence pour tous les patients.'
+        : ''
 
   return (
     <Modal
@@ -299,7 +305,7 @@ export default function CampaignModal({
               rows={5}
               maxLength={160}
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="Bonjour, ..."
+              placeholder={messagePlaceholder}
             />
             <p className="mt-1 text-xs text-gray-500">{message.length}/160</p>
           </div>

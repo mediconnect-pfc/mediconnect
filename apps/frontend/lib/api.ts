@@ -51,6 +51,17 @@ export interface CampaignInput {
   scheduledAt?: string | null
 }
 
+export interface DossierInput {
+  patientId: string
+  notes?: string
+  ordonnance?: string
+}
+
+export interface DossierUpdateInput {
+  notes?: string
+  ordonnance?: string
+}
+
 export async function getCampaigns(token?: string) {
   const headers = token ? authHeadersWithToken(token) : authHeaders()
   const res = await handleAuthResponse(await fetch(`${API_URL}/campaigns`, { headers }))
@@ -124,6 +135,50 @@ export async function launchCampaignWithCsv(token: string, id: string, file: Fil
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.message || 'Erreur lancement campagne CSV')
+  }
+
+  return res.json()
+}
+
+export async function createDossier(token: string, data: DossierInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/dossiers`, {
+    method: 'POST',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur creation dossier')
+  }
+
+  return res.json()
+}
+
+export async function updateDossier(token: string, id: string, data: DossierUpdateInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/dossiers/${id}`, {
+    method: 'PATCH',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur modification dossier')
+  }
+
+  return res.json()
+}
+
+export async function deleteDossier(token: string, id: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/dossiers/${id}`, {
+    method: 'DELETE',
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur suppression dossier')
   }
 
   return res.json()

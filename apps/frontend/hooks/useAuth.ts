@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@/types'
-import { API_URL, clearAuthToken, getAuthToken } from '@/lib/api'
+import { clearAuthToken, getAuthToken } from '@/lib/api'
 
 function setCookie(token: string) {
   document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`
@@ -24,7 +24,7 @@ export function useAuth() {
       return
     }
 
-    fetch(`${API_URL}/auth/me`, {
+    fetch('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -52,7 +52,7 @@ export function useAuth() {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

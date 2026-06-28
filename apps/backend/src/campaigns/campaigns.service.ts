@@ -70,7 +70,7 @@ export class CampaignsService {
           {
             jobId: `campaign-${message.id}`,
             delay,
-            attempts: 3,
+            attempts: 2,
             backoff: { type: 'exponential', delay: 15_000 },
             removeOnComplete: true,
             removeOnFail: false,

@@ -1,293 +1,484 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useKPIWebSocket } from '@/hooks/useKPIWebSocket'
-import KPIDashboard from '@/components/Analytics/KPIDashboard'
-import AppointmentsChart from '@/components/Analytics/AppointmentsChart'
-import ConfirmationsChart from '@/components/Analytics/ConfirmationsChart'
-import CancellationsChart from '@/components/Analytics/CancellationsChart'
-import Spinner from '@/components/ui/Spinner'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Download,
+  LineChart as LineChartIcon,
+  MessageSquare,
+  PhoneCall,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react'
+import {
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from 'recharts'
 import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
-import { FileText, Download } from 'lucide-react'
+import { API_URL, getAuthToken } from '@/lib/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('token')
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  window.URL.revokeObjectURL(url)
-}
-
-interface ChartRow {
-  date: string
-  count: number
-  confirmations: number
-  cancellations: number
-}
-
-interface KpiMetrics {
+type KpiMetrics = {
   totalAppointments: number
   confirmationRate: number
   cancellationRate: number
+  noShowRate: number
   totalSMSSent: number
+  totalCallsMade: number
+  totalPatients: number
 }
 
-interface KpiReportResponse {
+type KpiResponse = {
   period: { startDate: string; endDate: string }
   metrics: KpiMetrics
   timestamp: string
 }
 
+type AppointmentSeriesPoint = {
+  date: string
+  count: number
+}
+
+type AppointmentSeriesResponse = {
+  period: { startDate: string; endDate: string }
+  data: AppointmentSeriesPoint[]
+  timestamp: string
+}
+
+const COLORS = {
+  blue: '#2563eb',
+  green: '#16a34a',
+  red: '#dc2626',
+  orange: '#ea580c',
+  purple: '#7c3aed',
+  grey: '#9ca3af',
+}
+
+function toDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function getToday() {
-  return new Date().toISOString().slice(0, 10)
+  return toDateInput(new Date())
 }
 
 function getThirtyDaysAgo() {
   const d = new Date()
   d.setDate(d.getDate() - 30)
-  return d.toISOString().slice(0, 10)
+  return toDateInput(d)
 }
 
-function getDaysBetween(start: string, end: string): string[] {
-  const days: string[] = []
-  const cur = new Date(start)
-  const last = new Date(end)
-  while (cur <= last) {
-    days.push(cur.toISOString().slice(0, 10))
-    cur.setDate(cur.getDate() + 1)
-  }
-  return days
-}
-
-async function fetchBlob(url: string, filename: string) {
-  const token = getToken()
-  if (!token) throw new Error('Non authentifie')
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+function formatDisplayDate(value: string) {
+  const date = new Date(value)
+  return date.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   })
+}
 
+function isZeroMetrics(metrics: KpiMetrics | null) {
+  if (!metrics) return true
+  return (
+    metrics.totalAppointments === 0 &&
+    metrics.confirmationRate === 0 &&
+    metrics.cancellationRate === 0 &&
+    metrics.noShowRate === 0 &&
+    metrics.totalSMSSent === 0 &&
+    metrics.totalCallsMade === 0 &&
+    metrics.totalPatients === 0
+  )
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: getAuthHeaders() })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.message || `Erreur export`)
+    throw new Error(body.message || `Erreur ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url, { headers: getAuthHeaders() })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || `Erreur ${res.status}`)
   }
 
-  downloadBlob(await res.blob(), filename)
+  const blob = await res.blob()
+  const objectUrl = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  window.URL.revokeObjectURL(objectUrl)
+}
+
+function LoadingCard() {
+  return <div className="h-28 animate-pulse rounded-2xl border border-gray-200 bg-gray-100" />
+}
+
+function MetricCard({
+  title,
+  value,
+  icon: Icon,
+  color,
+}: {
+  title: string
+  value: string
+  icon: ComponentType<{ size?: number; className?: string }>
+  color: keyof typeof COLORS
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900">{value}</p>
+        </div>
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-sm"
+          style={{ backgroundColor: COLORS[color] }}
+        >
+          <Icon size={20} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function AnalyticsPage() {
-  const { kpis, loading, connected, lastUpdated, refresh } = useKPIWebSocket()
   const [startDate, setStartDate] = useState(getThirtyDaysAgo)
   const [endDate, setEndDate] = useState(getToday)
-  const [chartData, setChartData] = useState<ChartRow[]>([])
-  const [chartLoading, setChartLoading] = useState(true)
-  const [chartError, setChartError] = useState<string | null>(null)
-  const [exportError, setExportError] = useState('')
-  const [patientExporting, setPatientExporting] = useState<'pdf' | 'csv' | null>(null)
-  const [patientError, setPatientError] = useState('')
+  const [kpis, setKpis] = useState<KpiResponse | null>(null)
+  const [appointmentsSeries, setAppointmentsSeries] = useState<AppointmentSeriesPoint[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [exporting, setExporting] = useState<'csv' | 'pdf' | null>(null)
+  const initialLoadRef = useRef(true)
 
-  const fetchAnalytics = useCallback(async (start: string, end: string) => {
-    setChartLoading(true)
-    setChartError(null)
-    try {
-      const token = getToken()
-      const res = await fetch(`${API_URL}/analytics/kpis?startDate=${start}&endDate=${end}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      if (!res.ok) {
-        throw new Error(res.status === 401 ? 'Non authentifie' : `Erreur ${res.status}`)
-      }
-      const json: KpiReportResponse = await res.json()
-      const days = getDaysBetween(start, end)
-      const confirmationRate = json.metrics.confirmationRate / 100
-      const cancellationRate = json.metrics.cancellationRate / 100
-
-      const rows: ChartRow[] = days.map((date) => {
-        const base = Math.max(Math.round(json.metrics.totalAppointments / Math.max(days.length, 1)), 1)
-        const variation = 0.7 + Math.random() * 0.6
-        const count = Math.round(base * variation)
-        return {
-          date,
-          count,
-          confirmations: Math.round(count * confirmationRate * (0.85 + Math.random() * 0.3)),
-          cancellations: Math.round(count * cancellationRate * (0.85 + Math.random() * 0.3)),
-        }
-      })
-
-      setChartData(rows)
-    } catch (err: any) {
-      setChartError(err.message || 'Erreur de chargement')
-    } finally {
-      setChartLoading(false)
+  const loadDashboard = useCallback(async () => {
+    if (!startDate || !endDate) return
+    if (startDate > endDate) {
+      setError('La date de debut doit etre anterieure a la date de fin')
+      setLoading(false)
+      setRefreshing(false)
+      return
     }
-  }, [])
+
+    setError('')
+    if (initialLoadRef.current) setLoading(true)
+    else setRefreshing(true)
+
+    try {
+      const [kpiResponse, seriesResponse] = await Promise.all([
+        fetchJson<KpiResponse>(`${API_URL}/analytics/kpis?startDate=${startDate}&endDate=${endDate}`),
+        fetchJson<AppointmentSeriesResponse>(`${API_URL}/analytics/appointments/week?startDate=${startDate}&endDate=${endDate}`),
+      ])
+
+      setKpis(kpiResponse)
+      setAppointmentsSeries(seriesResponse.data ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de chargement des indicateurs')
+      setKpis(null)
+      setAppointmentsSeries([])
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+      initialLoadRef.current = false
+    }
+  }, [endDate, startDate])
 
   useEffect(() => {
-    fetchAnalytics(startDate, endDate)
-  }, [startDate, endDate, fetchAnalytics])
+    void loadDashboard()
+  }, [loadDashboard])
 
-  const handleExportCSV = useCallback(async () => {
-    setExportError('')
+  const pieData = useMemo(() => {
+    const metrics = kpis?.metrics
+    if (!metrics) return []
+
+    const pending = Math.max(0, 100 - (metrics.confirmationRate + metrics.cancellationRate + metrics.noShowRate))
+    return [
+      { name: 'Confirmés', value: metrics.confirmationRate, color: COLORS.green },
+      { name: 'Annulés', value: metrics.cancellationRate, color: COLORS.red },
+      { name: 'No-show', value: metrics.noShowRate, color: COLORS.orange },
+      { name: 'En attente', value: pending, color: COLORS.grey },
+    ].filter((item) => item.value > 0)
+  }, [kpis])
+
+  const hasNoData = !error && isZeroMetrics(kpis?.metrics ?? null)
+
+  const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
+    setExporting(format)
     try {
-      await fetchBlob(
-        `${API_URL}/analytics/export?format=csv&dateFrom=${startDate}&dateTo=${endDate}`,
-        `analytics-${startDate}-${endDate}.csv`,
+      await downloadFile(
+        `${API_URL}/analytics/export?format=${format}&startDate=${startDate}&endDate=${endDate}`,
+        `analytics-${startDate}-${endDate}.${format}`,
       )
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Erreur export CSV')
-    }
-  }, [startDate, endDate])
-
-  const handleExportPDF = useCallback(async () => {
-    setExportError('')
-    try {
-      await fetchBlob(
-        `${API_URL}/analytics/export?format=pdf&dateFrom=${startDate}&dateTo=${endDate}`,
-        `analytics-${startDate}-${endDate}.pdf`,
-      )
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Erreur export PDF')
-    }
-  }, [startDate, endDate])
-
-  async function exportPatients(format: 'pdf' | 'csv') {
-    const token = getToken()
-    if (!token) throw new Error('Non authentifie')
-
-    const res = await fetch(`${API_URL}/patients/export/${format}?startDate=${startDate}&endDate=${endDate}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      throw new Error(body.message || `Erreur export ${format}`)
-    }
-
-    downloadBlob(await res.blob(), `patients-${startDate}-${endDate}.${format}`)
-  }
-
-  async function handlePatientExport(format: 'pdf' | 'csv') {
-    setPatientError('')
-    setPatientExporting(format)
-    try {
-      await exportPatients(format)
-    } catch (err) {
-      setPatientError(err instanceof Error ? err.message : 'Erreur d\'export')
+      setError(err instanceof Error ? err.message : `Erreur export ${format}`)
     } finally {
-      setPatientExporting(null)
+      setExporting(null)
     }
-  }
+  }, [endDate, startDate])
+
+  const metrics = kpis?.metrics
 
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
-        <h1 className="text-2xl font-bold text-gray-900">Tableau de bord analytique</h1>
-        <p className="text-sm text-gray-500">Indicateurs de performance et tendances de la clinique</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-gray-900">Tableau de bord analytique</h1>
+          <p className="text-sm text-gray-500">Indicateurs de performance de votre clinique</p>
+          {kpis && (
+            <p className="text-xs text-gray-400">
+              Dernière mise à jour : {formatDisplayDate(kpis.timestamp)}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              Date début
+            </label>
+            <input
+              id="startDate"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+              Date fin
+            </label>
+            <input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+          <Button
+            onClick={() => void loadDashboard()}
+            loading={refreshing}
+            icon={<RefreshCw size={16} />}
+            className="h-11"
+          >
+            Actualiser
+          </Button>
+        </div>
       </div>
 
-      <KPIDashboard
-        kpis={kpis}
-        loading={loading}
-        connected={connected}
-        lastUpdated={lastUpdated}
-        onRefresh={refresh}
-        onExportCSV={handleExportCSV}
-        onExportPDF={handleExportPDF}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
-
-      {exportError && <p className="text-sm text-red-500">{exportError}</p>}
-
-      {chartLoading && !chartData.length && (
-        <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" />
-        </div>
-      )}
-
-      {chartError && !chartLoading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
-          {chartError}
-        </div>
-      )}
-
-      {chartData.length > 0 && !chartLoading && (
-        <>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <AppointmentsChart data={chartData} title="Evolution des rendez-vous" />
-            <ConfirmationsChart data={chartData} title="Confirmations par jour" />
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <LoadingCard key={index} />
+            ))}
           </div>
-          <CancellationsChart data={chartData} title="Annulations par jour" />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <LoadingCard />
+            <LoadingCard />
+          </div>
+          <LoadingCard />
+        </div>
+      ) : (
+        <>
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <section className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <MetricCard
+                title="Total RDV"
+                value={String(metrics?.totalAppointments ?? 0)}
+                icon={CalendarDays}
+                color="blue"
+              />
+              <MetricCard
+                title="Taux de confirmation"
+                value={`${metrics?.confirmationRate ?? 0}%`}
+                icon={CheckCircle2}
+                color="green"
+              />
+              <MetricCard
+                title="Taux d'annulation"
+                value={`${metrics?.cancellationRate ?? 0}%`}
+                icon={XCircle}
+                color="red"
+              />
+              <MetricCard
+                title="Taux de no-show"
+                value={`${metrics?.noShowRate ?? 0}%`}
+                icon={Clock3}
+                color="orange"
+              />
+              <MetricCard
+                title="SMS envoyés"
+                value={String(metrics?.totalSMSSent ?? 0)}
+                icon={MessageSquare}
+                color="purple"
+              />
+              <MetricCard
+                title="Appels passés"
+                value={String(metrics?.totalCallsMade ?? 0)}
+                icon={PhoneCall}
+                color="blue"
+              />
+            </div>
+
+            {hasNoData && (
+              <div className="rounded-2xl border border-gray-200 bg-white px-6 py-10 text-center text-gray-500 shadow-sm">
+                Aucune donnée
+              </div>
+            )}
+          </section>
+
+          {!hasNoData && (
+            <section className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <LineChartIcon size={18} className="text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Évolution des RDV</h2>
+                </div>
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={appointmentsSeries}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => {
+                          const date = new Date(value)
+                          return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+                        }}
+                        stroke="#6b7280"
+                      />
+                      <YAxis allowDecimals={false} stroke="#6b7280" />
+                      <Tooltip
+                        labelFormatter={(label) =>
+                          new Date(String(label)).toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                          })
+                        }
+                        formatter={(value) => [String(value ?? 0), 'RDV']}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke={COLORS.blue}
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-green-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Répartition des statuts</h2>
+                </div>
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={110}
+                        innerRadius={60}
+                        paddingAngle={2}
+                      >
+                        {pieData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value ?? 0}%`, 'Part']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Exports</h2>
+                <p className="text-sm text-gray-500">
+                  Exportez les indicateurs de la période sélectionnée.
+                </p>
+              </div>
+              <div className="text-xs text-gray-400">
+                {startDate} → {endDate}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                icon={<Download size={16} />}
+                loading={exporting === 'csv'}
+                onClick={() => void handleExport('csv')}
+                disabled={!startDate || !endDate}
+              >
+                Export CSV
+              </Button>
+              <Button
+                icon={<Download size={16} />}
+                loading={exporting === 'pdf'}
+                onClick={() => void handleExport('pdf')}
+                disabled={!startDate || !endDate}
+              >
+                Export PDF
+              </Button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-600">
+            <p className="font-medium text-gray-800">Lecture des cartes</p>
+            <p className="mt-1">
+              Les indicateurs suivent l’activité clinique de la période choisie : rendez-vous,
+              confirmations, annulations, no-shows, SMS envoyés et appels passés.
+              {metrics?.totalPatients ? ` Patients actifs : ${metrics.totalPatients}.` : ''}
+            </p>
+          </section>
         </>
       )}
-
-      <Card>
-        <div className="space-y-5">
-          <h3 className="text-lg font-semibold text-gray-900">Exporter la liste des patients</h3>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="patientStartDate" className="block text-sm font-medium text-gray-700">
-                Date debut
-              </label>
-              <input
-                id="patientStartDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-            </div>
-            <div>
-              <label htmlFor="patientEndDate" className="block text-sm font-medium text-gray-700">
-                Date fin
-              </label>
-              <input
-                id="patientEndDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              icon={<FileText size={16} />}
-              loading={patientExporting === 'pdf'}
-              disabled={!startDate || !endDate}
-              onClick={() => handlePatientExport('pdf')}
-            >
-              Exporter PDF
-            </Button>
-            <Button
-              variant="secondary"
-              icon={<Download size={16} />}
-              loading={patientExporting === 'csv'}
-              disabled={!startDate || !endDate}
-              onClick={() => handlePatientExport('csv')}
-            >
-              Exporter CSV
-            </Button>
-          </div>
-
-          {patientError && <p className="text-sm text-red-500">{patientError}</p>}
-        </div>
-      </Card>
     </div>
   )
 }

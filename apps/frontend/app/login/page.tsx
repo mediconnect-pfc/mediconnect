@@ -3,8 +3,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
-
 function setCookie(token: string) {
   document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`
 }
@@ -36,7 +34,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

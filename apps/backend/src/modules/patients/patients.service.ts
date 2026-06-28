@@ -7,6 +7,14 @@ export class PatientsService {
 
   constructor(private prisma: PrismaService) {}
 
+  private mapPatientDoctorName<T extends { appointments?: Array<{ doctor?: { name: string } | null }> }>(patient: T) {
+    const latestAppointment = patient.appointments?.[0];
+    return {
+      ...patient,
+      doctorName: latestAppointment?.doctor?.name ?? null,
+    };
+  }
+
   async findAll(
     establishmentId: string,
     page: number,
@@ -38,16 +46,20 @@ export class PatientsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          appointments: { take: 1, orderBy: { slot: 'desc' } },
+          appointments: {
+            take: 1,
+            orderBy: { slot: 'desc' },
+            include: { doctor: { select: { name: true } } },
+          },
         },
       }),
       this.prisma.patient.count({ where }),
     ]);
 
     return {
-      data: data.map(({ appointments, ...p }) => ({
-        ...p,
-        lastAppointment: appointments[0]?.slot?.toISOString() ?? null,
+      data: data.map((patient) => ({
+        ...this.mapPatientDoctorName(patient),
+        lastAppointment: patient.appointments?.[0]?.slot?.toISOString() ?? null,
       })),
       total,
       page,
@@ -59,11 +71,19 @@ export class PatientsService {
     const patient = await this.prisma.patient.findFirst({
       where: { id, establishmentId, deletedAt: null },
       include: {
-        appointments: { orderBy: { slot: 'desc' } },
+        appointments: {
+          orderBy: { slot: 'desc' },
+          include: { doctor: { select: { name: true } } },
+        },
         interactions: { orderBy: { createdAt: 'desc' }, take: 10 },
       },
     });
-    return patient;
+    if (!patient) return patient;
+
+    return this.mapPatientDoctorName({
+      ...patient,
+      lastAppointment: patient.appointments?.[0]?.slot?.toISOString() ?? null,
+    });
   }
 
   async create(data: {

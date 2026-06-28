@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Pencil, Trash2, Phone, Mail, Calendar, MapPin } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 import { usePatients } from '@/hooks/usePatients'
 import PatientModal from '@/components/patients/PatientModal'
 import Timeline from '@/components/patients/Timeline'
@@ -10,6 +11,7 @@ import TimelineSkeleton from '@/components/patients/TimelineSkeleton'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
+import { updateDossier } from '@/lib/api'
 import type { Patient, TimelineItem, InteractionData, AppointmentData, MedicalRecordData } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
@@ -46,13 +48,34 @@ function buildTimeline(
   return [
     ...interactions.map((d) => ({ id: `int-${d.id}`, type: 'interaction' as const, timestamp: d.createdAt, data: d })),
     ...appointments.map((d) => ({ id: `apt-${d.id}`, type: 'appointment' as const, timestamp: d.dateTime, data: d })),
-    ...records.map((d) => ({ id: `rec-${d.id}`, type: 'medical_record' as const, timestamp: d.date, data: d })),
+    ...records.map((d) => ({
+      id: `rec-${d.id}`,
+      type: 'medical_record' as const,
+      timestamp: d.date || d.consultationDate || new Date().toISOString(),
+      data: d,
+    })),
   ]
+}
+
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object' && Array.isArray((value as { data?: unknown }).data)) {
+    return (value as { data: T[] }).data
+  }
+  return []
+}
+
+function formatDateOnly(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { user } = useAuth()
   const { getPatient, updatePatient, deletePatient } = usePatients()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,6 +83,12 @@ export default function PatientDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([])
   const [timelineLoading, setTimelineLoading] = useState(true)
+  const [recordEditOpen, setRecordEditOpen] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecordData | null>(null)
+  const [recordNotes, setRecordNotes] = useState('')
+  const [recordOrdonnance, setRecordOrdonnance] = useState('')
+  const [recordSaving, setRecordSaving] = useState(false)
+  const [recordError, setRecordError] = useState('')
   const wsRef = useRef<WebSocket | null>(null)
 
   const fetchTimeline = useCallback(async () => {
@@ -75,7 +104,7 @@ export default function PatientDetailPage() {
 
       try {
         const res = await fetch(`${API_URL}/patients/${id}/interactions`, { headers })
-        if (res.ok) interactions = await res.json()
+        if (res.ok) interactions = asArray<InteractionData>(await res.json())
       } catch {
         interactions = []
       }
@@ -83,7 +112,7 @@ export default function PatientDetailPage() {
 
       try {
         const res = await fetch(`${API_URL}/patients/${id}/appointments`, { headers })
-        if (res.ok) appointments = await res.json()
+        if (res.ok) appointments = asArray<AppointmentData>(await res.json())
       } catch {
         appointments = []
       }
@@ -91,7 +120,16 @@ export default function PatientDetailPage() {
 
       try {
         const res = await fetch(`${API_URL}/dossiers/patient/${id}`, { headers })
-        if (res.ok) records = await res.json()
+        if (res.ok) {
+          records = asArray<any>(await res.json()).map((record) => ({
+            ...record,
+            date: record.date ?? record.consultationDate ?? record.createdAt,
+            prescriptions: record.prescriptions ?? record.ordonnance,
+            ordonnance: record.ordonnance ?? record.prescriptions,
+            medecinId: record.medecinId,
+            doctorName: record.medecin?.name ?? record.doctorName ?? record.medecin?.email ?? 'Médecin',
+          }))
+        }
       } catch {
         records = []
       }
@@ -140,6 +178,42 @@ export default function PatientDetailPage() {
   async function handleDelete() {
     const ok = await deletePatient(id)
     if (ok) router.push('/dashboard/patients')
+  }
+
+  function openEditRecord(record: MedicalRecordData) {
+    setSelectedRecord(record)
+    setRecordNotes(record.notes || '')
+    setRecordOrdonnance(record.ordonnance || record.prescriptions || '')
+    setRecordError('')
+    setRecordEditOpen(true)
+  }
+
+  function canManageRecord(record: MedicalRecordData) {
+    return user?.role === 'DOCTOR' && Boolean(user?.id) && record.medecinId === user.id
+  }
+
+  async function saveRecord() {
+    if (!selectedRecord) return
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setRecordError('Session expiree')
+      return
+    }
+
+    setRecordSaving(true)
+    setRecordError('')
+    try {
+      await updateDossier(token, selectedRecord.id, {
+        notes: recordNotes.trim() || undefined,
+        ordonnance: recordOrdonnance.trim() || undefined,
+      })
+      setRecordEditOpen(false)
+      await fetchTimeline()
+    } catch (error) {
+      setRecordError(error instanceof Error ? error.message : 'Erreur modification dossier')
+    } finally {
+      setRecordSaving(false)
+    }
   }
 
   if (loading) {
@@ -198,7 +272,7 @@ export default function PatientDetailPage() {
               <Phone size={16} className="text-gray-400" /> {patient.phone}
             </div>
             <div className="flex items-center gap-3 text-gray-600">
-              <Calendar size={16} className="text-gray-400" /> {patient.birthDate || '—'}
+              <Calendar size={16} className="text-gray-400" /> {formatDateOnly(patient.birthDate)}
             </div>
             <div className="flex items-center gap-3 text-gray-600">
               <MapPin size={16} className="text-gray-400" /> {patient.address || '—'}
@@ -224,7 +298,15 @@ export default function PatientDetailPage() {
 
         <div className="xl:col-span-3">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Historique des interactions</h2>
-          {timelineLoading ? <TimelineSkeleton /> : <Timeline items={timelineItems} />}
+          {timelineLoading ? (
+            <TimelineSkeleton />
+          ) : (
+            <Timeline
+              items={timelineItems}
+              canManageMedicalRecord={canManageRecord}
+              onEditMedicalRecord={openEditRecord}
+            />
+          )}
         </div>
       </div>
 
@@ -257,6 +339,50 @@ export default function PatientDetailPage() {
           Etes-vous sur de vouloir supprimer <strong>{fullName}</strong> ? Cette action est irreversible.
         </p>
       </Modal>
+
+      <Modal
+        open={recordEditOpen}
+        onClose={() => setRecordEditOpen(false)}
+        title="Modifier la consultation"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setRecordEditOpen(false)}>Annuler</Button>
+            <Button loading={recordSaving} onClick={saveRecord}>Enregistrer</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-800">
+            Les modifications sont réservées au médecin créateur de cette consultation.
+          </div>
+          <div>
+            <label htmlFor="recordNotes" className="block text-sm font-medium text-gray-700">
+              Notes de consultation
+            </label>
+            <textarea
+              id="recordNotes"
+              rows={5}
+              value={recordNotes}
+              onChange={(e) => setRecordNotes(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+          <div>
+            <label htmlFor="recordOrdonnance" className="block text-sm font-medium text-gray-700">
+              Ordonnance
+            </label>
+            <textarea
+              id="recordOrdonnance"
+              rows={7}
+              value={recordOrdonnance}
+              onChange={(e) => setRecordOrdonnance(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+          {recordError && <p className="text-sm text-red-600">{recordError}</p>}
+        </div>
+      </Modal>
+
     </div>
   )
 }

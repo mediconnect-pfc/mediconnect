@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { CampaignStatus, MessageStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +16,7 @@ export class CampaignProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly gomobile: GomobileService,
     private readonly campaignsService: CampaignsService,
+    private readonly config: ConfigService,
   ) {
     super();
   }
@@ -25,7 +27,17 @@ export class CampaignProcessor extends WorkerHost {
     const campaignMessage = await this.prisma.campaignMessage.findUnique({
       where: { id: campaignMessageId },
       include: {
-        campaign: true,
+        campaign: {
+          include: {
+            establishment: {
+              select: {
+                name: true,
+                phone: true,
+                address: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -44,6 +56,7 @@ export class CampaignProcessor extends WorkerHost {
 
     const targetPhone = phone?.trim() || campaignMessage.phone?.trim() || '';
     const targetName = name?.trim() || campaignMessage.contactName?.trim() || 'Patient';
+    let gomobileJobId = campaignMessage.externalRef?.trim() || undefined;
 
     if (!targetPhone) {
       await this.campaignsService.markMessageFailed(campaignMessageId);
@@ -53,21 +66,72 @@ export class CampaignProcessor extends WorkerHost {
 
     try {
       if (type === 'VOICE') {
-        const result = await this.gomobile.triggerCallByPhone({
-          phone: targetPhone,
-          fullName: targetName,
-          attributes: {
-            patientName: targetName,
-            message,
-          },
+        if (!gomobileJobId) {
+          const vaccinationFlowId = this.gomobile.getCallFlowId('vaccination');
+          const senderId =
+            this.config.get<string>('GOMOBILE_SENDER_ID') ??
+            this.config.get<string>('GOMOBILE_SENDER_ID_VACCINATION') ??
+            'CLINIQUE';
+          const campaignStartDate =
+            this.config.get<string>('VACCINATION_CAMPAIGN_START_DATE') ?? '';
+          const campaignEndDate =
+            this.config.get<string>('VACCINATION_CAMPAIGN_END_DATE') ?? '';
+          const vaccinationLocation =
+            this.config.get<string>('VACCINATION_LOCATION') ??
+            campaignMessage.campaign.establishment.address ??
+            '';
+          const appointmentPhone =
+            this.config.get<string>('VACCINATION_APPOINTMENT_PHONE') ??
+            campaignMessage.campaign.establishment.phone ??
+            '';
+
+          const result = await this.gomobile.triggerCallByPhone(
+            {
+              phone: targetPhone,
+              fullName: targetName,
+              attributes: {
+                patientName: targetName,
+                clinicName: campaignMessage.campaign.establishment.name,
+                campaignStartDate,
+                campaignEndDate,
+                vaccinationLocation,
+                appointmentPhone,
+                senderId,
+              },
+            },
+            vaccinationFlowId,
+          );
+
+          gomobileJobId = result.jobId;
+
+          await this.prisma.campaignMessage.update({
+            where: { id: campaignMessageId },
+            data: {
+              status: MessageStatus.SENT,
+              externalRef: gomobileJobId,
+            },
+          });
+        }
+
+        const report = await this.gomobile.pollCallReport(gomobileJobId, {
+          intervalMs: 5_000,
+          maxWaitMs: 120_000,
         });
+
+        const lastAttempt = report.attempts?.[report.attempts.length - 1];
+        const finalVariables = lastAttempt?.flowExecution?.finalVariables;
+        const vaccinationResponse = finalVariables?.['vaccination.response'];
+        const dtmfResponse = finalVariables?.['dtmf.response'];
+        this.logger.log(
+          `Campaign voice call ${campaignMessageId} finished with response=${String(vaccinationResponse ?? 'unknown')} dtmf=${String(dtmfResponse ?? 'unknown')}`,
+        );
 
         await this.prisma.campaignMessage.update({
           where: { id: campaignMessageId },
           data: {
-            status: MessageStatus.DELIVERED,
-            deliveredAt: new Date(),
-            externalRef: result.jobId ?? `sent_${Date.now()}`,
+            status: report.status === 'completed' ? MessageStatus.DELIVERED : MessageStatus.FAILED,
+            deliveredAt: report.status === 'completed' ? new Date() : null,
+            externalRef: gomobileJobId ?? `sent_${Date.now()}`,
           },
         });
       } else {

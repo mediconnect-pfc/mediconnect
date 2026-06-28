@@ -2,8 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
-
 export default function ResetPasswordPage() {
   const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
@@ -31,7 +29,7 @@ export default function ResetPasswordPage() {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/reset-password`, {
+      const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),

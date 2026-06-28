@@ -81,9 +81,15 @@ export interface AppointmentData {
 export interface MedicalRecordData {
   id: string
   doctorName: string
-  date: string
+  medecinId?: string | null
+  date?: string
+  consultationDate?: string
   notes?: string
   prescriptions?: string
+  ordonnance?: string
+  patientId?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface TimelineItem {

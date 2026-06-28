@@ -37,6 +37,7 @@ interface SidebarProps {
 
 function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>) {
   const pathname = usePathname()
+  const canManageCampaigns = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
 
   return (
     <div className="flex h-full w-64 flex-col bg-[#0f1f3d]">
@@ -58,7 +59,9 @@ function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>)
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems
+          .filter((item) => item.href !== '/dashboard/campaigns' || canManageCampaigns)
+          .map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link key={href} href={href} onClick={onClose}>
@@ -75,9 +78,13 @@ function SidebarContent({ user, onLogout, onClose }: Omit<SidebarProps, 'open'>)
         })}
 
         <div className="mt-4">
-          <button className="flex w-full items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700">
+          <Link
+            href="/dashboard/dossiers/new"
+            onClick={onClose}
+            className="flex w-full items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
             <Plus size={16} /> Nouvelle consultation
-          </button>
+          </Link>
         </div>
       </nav>
 

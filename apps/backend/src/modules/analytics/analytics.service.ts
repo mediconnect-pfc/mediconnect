@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { KpiData, KpiResponse } from './interfaces/kpi.interface';
+import {
+  type AppointmentSeriesResponse,
+  type KpiData,
+  type KpiResponse,
+} from './interfaces/kpi.interface';
 
 @Injectable()
 export class AnalyticsService {
@@ -31,8 +36,20 @@ export class AnalyticsService {
           campaign: { establishmentId },
         }
       : { createdAt: dateFilter };
+    const patientWhere = establishmentId
+      ? { establishmentId, deletedAt: null }
+      : { deletedAt: null };
 
-    const [totalAppointments, confirmedAppointments, cancelledAppointments, totalSMSSent] =
+    const [
+      totalAppointments,
+      confirmedAppointments,
+      cancelledAppointments,
+      noShowAppointments,
+      smsNotificationsDelivered,
+      campaignMessagesDelivered,
+      totalCallsMade,
+      totalPatients,
+    ] =
       await Promise.all([
         this.prisma.appointment.count({
           where: appointmentWhere,
@@ -43,10 +60,38 @@ export class AnalyticsService {
         this.prisma.appointment.count({
           where: { ...appointmentWhere, status: 'CANCELLED' },
         }),
+        this.prisma.appointment.count({
+          where: { ...appointmentWhere, status: 'NO_SHOW' },
+        }),
+        this.prisma.notification.count({
+          where: {
+            channel: NotificationChannel.SMS,
+            status: NotificationStatus.DELIVERED,
+            ...(establishmentId ? { patient: { establishmentId, deletedAt: null } } : {}),
+          },
+        }),
         this.prisma.campaignMessage.count({
-          where: campaignWhere,
+          where: {
+            ...campaignWhere,
+            status: 'DELIVERED',
+            campaign: {
+              ...(establishmentId ? { establishmentId } : {}),
+              type: { in: ['SMS', 'EMERGENCY'] },
+            },
+          },
+        }),
+        this.prisma.notification.count({
+          where: {
+            channel: NotificationChannel.CALL,
+            status: NotificationStatus.DELIVERED,
+            ...(establishmentId ? { patient: { establishmentId, deletedAt: null } } : {}),
+          },
+        }),
+        this.prisma.patient.count({
+          where: patientWhere,
         }),
       ]);
+    const totalSMSSent = smsNotificationsDelivered + campaignMessagesDelivered;
 
     const confirmationRate =
       totalAppointments > 0
@@ -58,14 +103,66 @@ export class AnalyticsService {
         ? Math.round((cancelledAppointments / totalAppointments) * 1000) / 10
         : 0;
 
+    const noShowRate =
+      totalAppointments > 0
+        ? Math.round((noShowAppointments / totalAppointments) * 1000) / 10
+        : 0;
+
     return {
       period: { startDate, endDate },
       metrics: {
         totalAppointments,
         confirmationRate,
         cancellationRate,
+        noShowRate,
         totalSMSSent,
+        totalCallsMade,
+        totalPatients,
       },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async computeAppointmentsSeries(
+    startDate: string,
+    endDate: string,
+    establishmentId?: string | null,
+  ): Promise<AppointmentSeriesResponse> {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const dateFilter = { gte: start, lte: end };
+    const appointments = await this.prisma.appointment.findMany({
+      where: establishmentId
+        ? {
+            slot: dateFilter,
+            patient: { establishmentId, deletedAt: null },
+          }
+        : { slot: dateFilter },
+      select: { slot: true },
+      orderBy: { slot: 'asc' },
+    });
+
+    const map = new Map<string, number>();
+    for (const appointment of appointments) {
+      const key = appointment.slot.toISOString().slice(0, 10);
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+
+    const data: AppointmentSeriesResponse['data'] = [];
+    const cursor = new Date(start);
+    cursor.setHours(0, 0, 0, 0);
+
+    while (cursor <= end) {
+      const key = cursor.toISOString().slice(0, 10);
+      data.push({ date: key, count: map.get(key) ?? 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return {
+      period: { startDate, endDate },
+      data,
       timestamp: new Date().toISOString(),
     };
   }

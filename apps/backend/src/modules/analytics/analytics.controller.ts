@@ -52,11 +52,31 @@ export class AnalyticsController {
     );
   }
 
+  @Get('appointments/week')
+  async getAppointmentsWeek(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const parsed = kpiQuerySchema.safeParse({ startDate, endDate });
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten().fieldErrors);
+    }
+
+    return this.service.computeAppointmentsSeries(
+      parsed.data.startDate,
+      parsed.data.endDate,
+      this.getEstablishmentId(user),
+    );
+  }
+
   @Get('export')
   async exportAnalytics(
     @CurrentUser() user: AuthenticatedUser,
     @Res() res: Response,
     @Query('format') format?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
@@ -64,7 +84,10 @@ export class AnalyticsController {
       throw new BadRequestException('format doit etre csv ou pdf');
     }
 
-    const parsed = kpiQuerySchema.safeParse({ startDate: dateFrom, endDate: dateTo });
+    const parsed = kpiQuerySchema.safeParse({
+      startDate: startDate ?? dateFrom,
+      endDate: endDate ?? dateTo,
+    });
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten().fieldErrors);
     }
@@ -83,7 +106,18 @@ export class AnalyticsController {
 
       const stringifier = stringify({
         header: true,
-        columns: ['periodStart', 'periodEnd', 'totalAppointments', 'confirmationRate', 'cancellationRate', 'totalSMSSent', 'timestamp'],
+        columns: [
+          'periodStart',
+          'periodEnd',
+          'totalAppointments',
+          'confirmationRate',
+          'cancellationRate',
+          'noShowRate',
+          'totalSMSSent',
+          'totalCallsMade',
+          'totalPatients',
+          'timestamp',
+        ],
       });
 
       stringifier.pipe(res);
@@ -93,7 +127,10 @@ export class AnalyticsController {
         totalAppointments: kpis.metrics.totalAppointments,
         confirmationRate: kpis.metrics.confirmationRate,
         cancellationRate: kpis.metrics.cancellationRate,
+        noShowRate: kpis.metrics.noShowRate,
         totalSMSSent: kpis.metrics.totalSMSSent,
+        totalCallsMade: kpis.metrics.totalCallsMade,
+        totalPatients: kpis.metrics.totalPatients,
         timestamp: kpis.timestamp,
       });
       stringifier.end();
@@ -113,7 +150,10 @@ export class AnalyticsController {
     doc.font('Helvetica-Bold').text(`Total appointments: ${kpis.metrics.totalAppointments}`);
     doc.font('Helvetica-Bold').text(`Confirmation rate: ${kpis.metrics.confirmationRate}%`);
     doc.font('Helvetica-Bold').text(`Cancellation rate: ${kpis.metrics.cancellationRate}%`);
+    doc.font('Helvetica-Bold').text(`No-show rate: ${kpis.metrics.noShowRate}%`);
     doc.font('Helvetica-Bold').text(`Total SMS sent: ${kpis.metrics.totalSMSSent}`);
+    doc.font('Helvetica-Bold').text(`Total calls made: ${kpis.metrics.totalCallsMade}`);
+    doc.font('Helvetica-Bold').text(`Total patients: ${kpis.metrics.totalPatients}`);
     doc.moveDown();
     doc.font('Helvetica').text(`Generated at: ${kpis.timestamp}`);
     doc.end();

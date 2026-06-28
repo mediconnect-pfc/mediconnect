@@ -1,25 +1,46 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { TimelineItem } from '@/types'
+import type { MedicalRecordData, TimelineItem } from '@/types'
 import InteractionItem from './InteractionItem'
 import AppointmentItem from './AppointmentItem'
 import MedicalRecordItem from './MedicalRecordItem'
 
 const ITEMS_PER_PAGE = 10
 
-function renderItem(item: TimelineItem) {
+type TimelineProps = {
+  items: TimelineItem[]
+  onEditMedicalRecord?: (record: MedicalRecordData) => void
+  canManageMedicalRecord?: (record: MedicalRecordData) => boolean
+}
+
+function renderItem(
+  item: TimelineItem,
+  onEditMedicalRecord?: (record: MedicalRecordData) => void,
+  canManageMedicalRecord?: (record: MedicalRecordData) => boolean,
+) {
   switch (item.type) {
     case 'interaction':
       return <InteractionItem key={item.id} data={item.data as any} />
     case 'appointment':
       return <AppointmentItem key={item.id} data={item.data as any} />
     case 'medical_record':
-      return <MedicalRecordItem key={item.id} data={item.data as any} />
+      return (
+        <MedicalRecordItem
+          key={item.id}
+          data={item.data as MedicalRecordData}
+          canManage={canManageMedicalRecord ? canManageMedicalRecord(item.data as MedicalRecordData) : false}
+          onEdit={onEditMedicalRecord ? () => onEditMedicalRecord(item.data as MedicalRecordData) : undefined}
+        />
+      )
   }
 }
 
-export default function Timeline({ items }: { items: TimelineItem[] }) {
+export default function Timeline({
+  items,
+  onEditMedicalRecord,
+  canManageMedicalRecord,
+}: TimelineProps) {
   const [page, setPage] = useState(1)
 
   const sorted = useMemo(
@@ -41,7 +62,7 @@ export default function Timeline({ items }: { items: TimelineItem[] }) {
 
   return (
     <div className="space-y-3">
-      {paginated.map(renderItem)}
+      {paginated.map((item) => renderItem(item, onEditMedicalRecord, canManageMedicalRecord))}
       {hasMore && (
         <div className="pt-2 text-center">
           <button

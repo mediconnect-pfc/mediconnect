@@ -7,12 +7,26 @@ export interface KpiMetrics {
   totalAppointments: number;
   confirmationRate: number;
   cancellationRate: number;
+  noShowRate: number;
   totalSMSSent: number;
+  totalCallsMade: number;
+  totalPatients: number;
 }
 
 export interface KpiResponse {
   period: KpiPeriod;
   metrics: KpiMetrics;
+  timestamp: string;
+}
+
+export interface AppointmentSeriesPoint {
+  date: string;
+  count: number;
+}
+
+export interface AppointmentSeriesResponse {
+  period: KpiPeriod;
+  data: AppointmentSeriesPoint[];
   timestamp: string;
 }
 

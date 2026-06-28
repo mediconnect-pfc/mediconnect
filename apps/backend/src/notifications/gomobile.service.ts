@@ -68,6 +68,7 @@ export class GomobileService {
   private readonly apiKey: string;
   private readonly senderId: string;
   private readonly flowIdH24: string;
+  private readonly flowIdVaccination: string;
   private readonly didId: string;
 
   constructor(private readonly config: ConfigService) {
@@ -75,6 +76,7 @@ export class GomobileService {
     this.apiKey = this.config.get<string>('GOMOBILE_API_KEY') ?? '';
     this.senderId = this.config.get<string>('GOMOBILE_SENDER_ID') ?? 'GoMobile';
     this.flowIdH24 = this.config.get<string>('GOMOBILE_FLOW_ID_H24') ?? '';
+    this.flowIdVaccination = this.config.get<string>('GOMOBILE_FLOW_ID_VACCINATION') ?? '';
     this.didId = this.config.get<string>('GOMOBILE_DID_ID') ?? '';
   }
 
@@ -82,8 +84,12 @@ export class GomobileService {
     return Boolean(this.baseUrl && this.apiKey && this.senderId);
   }
 
-  isCallConfigured(): boolean {
-    return Boolean(this.baseUrl && this.apiKey && this.flowIdH24 && this.didId);
+  getCallFlowId(kind: 'h24' | 'vaccination' = 'h24'): string {
+    return kind === 'vaccination' ? this.flowIdVaccination : this.flowIdH24;
+  }
+
+  isCallConfigured(flowId: string = this.flowIdH24): boolean {
+    return Boolean(this.baseUrl && this.apiKey && flowId && this.didId);
   }
 
   /** @deprecated use isSmsConfigured */
@@ -111,19 +117,24 @@ export class GomobileService {
 
   async triggerCallByPhone(
     payload: Omit<GomobileCallRequestPayload, 'flowId' | 'didId'>,
+    flowId: string = this.flowIdH24,
   ): Promise<GomobileCallRequestResult> {
-    if (!this.isCallConfigured()) {
+    if (!this.isCallConfigured(flowId)) {
       throw new GomobileApiError('GoMobile call is not configured', 0, false);
     }
 
+    const { retry, attributes, ...rest } = payload;
     const { data, status } = await this.request<GomobileCallRequestResult>(
       'post',
       '/call-requests/by-phone',
       {
-        flowId: this.flowIdH24,
+        flowId,
         didId: this.didId,
-        retry: { type: 'none' },
-        ...payload,
+        ...(retry ? { retry } : {}),
+        ...rest,
+        attributes: Object.fromEntries(
+          Object.entries(attributes ?? {}).map(([key, value]) => [key, String(value)]),
+        ),
       },
       [202, 201, 200],
     );
