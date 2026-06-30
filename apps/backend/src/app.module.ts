@@ -25,12 +25,18 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get<string>('REDIS_HOST', '127.0.0.1'),
-          port: parseInt(config.get<string>('REDIS_PORT', '6379'), 10),
-          maxRetriesPerRequest: null,
-          enableReadyCheck: false,
-        },
+        connection: config.get<string>('REDIS_URL')
+          ? {
+              url: config.get<string>('REDIS_URL'),
+              maxRetriesPerRequest: null,
+              enableReadyCheck: false,
+            }
+          : {
+              host: config.get<string>('REDIS_HOST', '127.0.0.1'),
+              port: parseInt(config.get<string>('REDIS_PORT', '6379'), 10),
+              maxRetriesPerRequest: null,
+              enableReadyCheck: false,
+            },
       }),
     }),
     PrismaModule,
