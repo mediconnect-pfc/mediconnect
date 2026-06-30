@@ -1,0 +1,9 @@
+{
+  "name": "mediconnect",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:backend": "cd apps/backend && npm install && npx nest build",
+    "start:backend": "cd apps/backend && node dist/main"
+  }
+}

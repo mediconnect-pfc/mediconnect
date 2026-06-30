@@ -167,6 +167,7 @@ export class PatientsController {
 
     const estabId = this.getEstId(req);
     const patients = await this.service.findAll(estabId, 1, 1000);
+    const list = patients.data;
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -187,7 +188,7 @@ export class PatientsController {
     doc.moveDown(0.5);
 
     doc.font('Helvetica').fontSize(9);
-    for (const p of (patients.data || patients)) {
+    for (const p of list) {
       const yStart = doc.y;
       const row = [`${p.firstName} ${p.lastName}`, p.phone, p.email || '—', p.status || '—'];
       row.forEach((val, i) => doc.text(val, colX[i], yStart, { width: 130 }));
@@ -211,7 +212,7 @@ export class PatientsController {
 
     const estabId = this.getEstId(req);
     const patients = await this.service.findAll(estabId, 1, 1000);
-    const list = patients.data || patients;
+    const list = patients.data;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="patients-${startDate}-${endDate}.csv"`);
