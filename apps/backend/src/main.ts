@@ -2,33 +2,14 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-
-const allowedOrigins = [process.env.FRONTEND_URL, process.env.PATIENT_PORTAL_URL]
-  .filter(Boolean)
-  .map((origin) => origin!.replace(/\/$/, '')) as string[];
-
-function isAllowedOrigin(origin: string) {
-  const normalized = origin.replace(/\/$/, '');
-
-  if (
-    /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i.test(normalized) ||
-    /^https?:\/\/\[::1\](:\d+)?$/i.test(normalized) ||
-    /^https?:\/\/[^/]+\.trycloudflare\.com$/i.test(normalized) ||
-    /^https?:\/\/[^/]+\.ngrok-free\.app$/i.test(normalized) ||
-    /^https?:\/\/[^/]+\.ngrok\.app$/i.test(normalized)
-  ) {
-    return true;
-  }
-
-  return allowedOrigins.includes(normalized);
-}
+import { isAllowedCorsOrigin } from './common/cors-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || isAllowedOrigin(origin)) {
+      if (!origin || isAllowedCorsOrigin(origin)) {
         callback(null, true);
         return;
       }
