@@ -83,11 +83,19 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const email = dto.email.trim().toLowerCase();
+    this.logger.log(`Password reset requested for ${email}`);
+
     const user = await this.prisma.user.findUnique({ where: { email } });
     const admin = user ? null : await this.prisma.superAdmin.findUnique({ where: { email } });
     const accountType = user ? 'user' : admin ? 'superadmin' : null;
 
+    if (!accountType) {
+      this.logger.warn(`Password reset requested for unknown account ${email}`);
+    }
+
     if (accountType) {
+      this.logger.log(`Password reset account found for ${email} (${accountType})`);
+
       const token = randomBytes(32).toString('hex');
       const tokenHash = this.hashToken(token);
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
@@ -105,6 +113,7 @@ export class AuthService {
 
       try {
         await this.mail.sendPasswordReset(email, resetLink);
+        this.logger.log(`Password reset email accepted by SMTP for ${email}`);
       } catch (error) {
         this.logger.error(
           `Failed to send password reset email to ${email}`,

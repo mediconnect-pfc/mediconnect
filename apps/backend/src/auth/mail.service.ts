@@ -26,6 +26,12 @@ export class MailService {
             auth: { user, pass },
           })
         : null;
+
+    if (this.transporter) {
+      this.logger.log(`SMTP configured with host ${host}:${port} as ${user}`);
+    } else {
+      this.logger.warn('SMTP not configured. Password reset emails will not be sent.');
+    }
   }
 
   isConfigured(): boolean {
@@ -38,7 +44,7 @@ export class MailService {
       return;
     }
 
-    await this.transporter.sendMail({
+    const info = await this.transporter.sendMail({
       from: this.from,
       to,
       subject: 'Reinitialisation de votre mot de passe MediConnect',
@@ -57,5 +63,7 @@ export class MailService {
         <p>Ce lien expire dans 1 heure. Si vous n etes pas a l origine de cette demande, ignorez cet email.</p>
       `,
     });
+
+    this.logger.log(`Password reset email sent to ${to}. Message id: ${info.messageId ?? 'unknown'}`);
   }
 }
