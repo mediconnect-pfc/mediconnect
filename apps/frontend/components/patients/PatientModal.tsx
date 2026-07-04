@@ -30,8 +30,8 @@ const statusOptions = [
 
 const phoneRegex = /^\+212\d{9}$/
 
-export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
-  const [form, setForm] = useState<PatientFormData>({
+function getInitialForm(initial?: Partial<PatientFormData>): PatientFormData {
+  return {
     firstName: initial?.firstName || '',
     lastName: initial?.lastName || '',
     email: initial?.email || '',
@@ -39,7 +39,11 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
     birthDate: initial?.birthDate || '',
     address: initial?.address || '',
     status: initial?.status || 'ACTIF',
-  })
+  }
+}
+
+export default function PatientModal({ open, onClose, onSave, initial }: PatientModalProps) {
+  const [form, setForm] = useState<PatientFormData>(() => getInitialForm(initial))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -64,7 +68,7 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
         setSaving(false)
         return
       }
-      onClose()
+      handleClose()
     } catch {
       setErrors({ general: 'Erreur lors de la sauvegarde' })
     } finally {
@@ -77,14 +81,20 @@ export default function PatientModal({ open, onClose, onSave, initial }: Patient
     setErrors((prev) => ({ ...prev, [field]: '' }))
   }
 
+  function handleClose() {
+    setForm(getInitialForm(initial))
+    setErrors({})
+    onClose()
+  }
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title={initial ? 'Modifier le patient' : 'Nouveau patient'}
       actions={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={handleClose}>
             Annuler
           </Button>
           <Button loading={saving} onClick={handleSubmit}>
