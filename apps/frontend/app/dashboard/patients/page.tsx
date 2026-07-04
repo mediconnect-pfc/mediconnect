@@ -236,7 +236,12 @@ export default function PatientsPage() {
 
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
 
-      <PatientModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleCreate} />
+      <PatientModal
+        key={modalOpen ? 'create-patient-open' : 'create-patient-closed'}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleCreate}
+      />
       <ImportCSVModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
     </div>
   )
