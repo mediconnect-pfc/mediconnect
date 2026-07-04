@@ -18,7 +18,7 @@ describe('PatientsService', () => {
   let moduleRef: TestingModule
 
   beforeEach(async () => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
     ;(global as any).crypto = {
       randomUUID: jest.fn().mockReturnValue('mock-uuid'),
     }
@@ -76,6 +76,7 @@ describe('PatientsService', () => {
   })
 
   it('imports a CSV-derived row and creates one patient', async () => {
+    mockPrisma.patient.findFirst.mockResolvedValue(null)
     mockPrisma.patient.create.mockResolvedValue({
       id: 'pat-1',
       firstName: 'Karima',
@@ -95,5 +96,41 @@ describe('PatientsService', () => {
         }),
       }),
     )
+  })
+
+  it('skips an imported patient when the phone already exists in the clinic', async () => {
+    mockPrisma.patient.findFirst.mockResolvedValue({ id: 'pat-existing' })
+
+    const result = await service.import('est-1', [
+      { firstName: 'Karima', lastName: 'Alaoui', phone: '+212661234567' },
+    ])
+
+    expect(result.imported).toBe(0)
+    expect(result.errors).toEqual([{ row: 1, message: 'Patient deja existant' }])
+    expect(mockPrisma.patient.create).not.toHaveBeenCalled()
+    expect(mockPrisma.patient.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          establishmentId: 'est-1',
+          deletedAt: null,
+          OR: expect.arrayContaining([{ phone: '+212661234567' }, { phone: '212661234567' }, { phone: '0661234567' }]),
+        }),
+      }),
+    )
+  })
+
+  it('skips duplicate phones within the same import file', async () => {
+    mockPrisma.patient.findFirst.mockResolvedValue(null)
+    mockPrisma.patient.create.mockResolvedValue({ id: 'pat-1' })
+
+    const result = await service.import('est-1', [
+      { firstName: 'Karima', lastName: 'Alaoui', phone: '+212661234567' },
+      { firstName: 'Karima', lastName: 'Alaoui', phone: '0661234567' },
+    ])
+
+    expect(result.imported).toBe(1)
+    expect(result.total).toBe(2)
+    expect(result.errors).toEqual([{ row: 2, message: 'Patient deja present dans le fichier' }])
+    expect(mockPrisma.patient.create).toHaveBeenCalledTimes(1)
   })
 })

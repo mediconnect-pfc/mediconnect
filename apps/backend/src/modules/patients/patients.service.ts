@@ -11,6 +11,29 @@ export class PatientsService {
     return `${firstName} ${lastName}`.trim();
   }
 
+  private phoneVariants(phone: string) {
+    const trimmed = phone.trim();
+    const variants = new Set([trimmed]);
+
+    if (/^0\d{9}$/.test(trimmed)) {
+      variants.add(`+212${trimmed.slice(1)}`);
+      variants.add(`212${trimmed.slice(1)}`);
+    } else if (/^\+212\d{9}$/.test(trimmed)) {
+      variants.add(trimmed.slice(1));
+      variants.add(`0${trimmed.slice(4)}`);
+    } else if (/^212\d{9}$/.test(trimmed)) {
+      variants.add(`+${trimmed}`);
+      variants.add(`0${trimmed.slice(3)}`);
+    }
+
+    return [...variants];
+  }
+
+  private canonicalPhone(phone: string) {
+    const variants = this.phoneVariants(phone);
+    return variants.find((variant) => variant.startsWith('+')) ?? variants[0];
+  }
+
   private mapPatientDoctorName<T extends { appointments?: Array<{ doctor?: { name: string } | null }> }>(patient: T) {
     const latestAppointment = patient.appointments?.[0];
     return {
@@ -207,17 +230,39 @@ export class PatientsService {
   ) {
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
+    const phonesInFile = new Set<string>();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
-        if (!row.firstName || !row.lastName || !row.phone) {
+        const phone = row.phone?.trim();
+
+        if (!row.firstName || !row.lastName || !phone) {
           errors.push({ row: i + 1, message: 'Champs requis manquants' });
           continue;
         }
 
-        if (!/^(?:\+?[1-9]\d{7,14}|0\d{9})$/.test(row.phone)) {
+        if (!/^(?:\+?[1-9]\d{7,14}|0\d{9})$/.test(phone)) {
           errors.push({ row: i + 1, message: 'Telephone invalide (9 a 15 chiffres ou format local 0XXXXXXXXX)' });
+          continue;
+        }
+
+        const canonicalPhone = this.canonicalPhone(phone);
+        if (phonesInFile.has(canonicalPhone)) {
+          errors.push({ row: i + 1, message: 'Patient deja present dans le fichier' });
+          continue;
+        }
+
+        const existing = await this.prisma.patient.findFirst({
+          where: {
+            establishmentId,
+            deletedAt: null,
+            OR: this.phoneVariants(phone).map((variant) => ({ phone: variant })),
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          errors.push({ row: i + 1, message: 'Patient deja existant' });
           continue;
         }
 
@@ -230,7 +275,7 @@ export class PatientsService {
             name: this.fullName(row.firstName, row.lastName),
             firstName: row.firstName,
             lastName: row.lastName,
-            phone: row.phone,
+            phone,
             birthDate: row.birthDate ? new Date(row.birthDate) : undefined,
             tags,
             status: (row.status as any) || 'ACTIF',
@@ -239,6 +284,7 @@ export class PatientsService {
             portalTokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           },
         });
+        phonesInFile.add(canonicalPhone);
         imported++;
       } catch (err: any) {
         errors.push({ row: i + 1, message: err.message || 'Erreur inconnue' });
