@@ -207,6 +207,7 @@ model PasswordResetToken {
 model Patient {
   id                String        @id @default(uuid())
   establishmentId   String
+  name              String?
   firstName         String
   lastName          String
   email             String?       @unique

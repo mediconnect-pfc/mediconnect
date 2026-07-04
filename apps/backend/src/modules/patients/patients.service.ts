@@ -7,6 +7,10 @@ export class PatientsService {
 
   constructor(private prisma: PrismaService) {}
 
+  private fullName(firstName: string, lastName: string) {
+    return `${firstName} ${lastName}`.trim();
+  }
+
   private mapPatientDoctorName<T extends { appointments?: Array<{ doctor?: { name: string } | null }> }>(patient: T) {
     const latestAppointment = patient.appointments?.[0];
     return {
@@ -99,6 +103,7 @@ export class PatientsService {
   }) {
     const patient = await this.prisma.patient.create({
       data: {
+        name: this.fullName(data.firstName, data.lastName),
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email ?? undefined,
@@ -133,9 +138,15 @@ export class PatientsService {
     });
     if (!patient) return null;
 
+    const nextFirstName = data.firstName ?? patient.firstName;
+    const nextLastName = data.lastName ?? patient.lastName;
+
     return this.prisma.patient.update({
       where: { id },
       data: {
+        ...((data.firstName !== undefined || data.lastName !== undefined) && {
+          name: this.fullName(nextFirstName, nextLastName),
+        }),
         ...(data.firstName !== undefined && { firstName: data.firstName }),
         ...(data.lastName !== undefined && { lastName: data.lastName }),
         ...(data.email !== undefined && { email: data.email ?? undefined }),
@@ -216,6 +227,7 @@ export class PatientsService {
 
         await this.prisma.patient.create({
           data: {
+            name: this.fullName(row.firstName, row.lastName),
             firstName: row.firstName,
             lastName: row.lastName,
             phone: row.phone,

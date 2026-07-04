@@ -54,6 +54,7 @@ describe('PatientsService', () => {
     expect(mockPrisma.patient.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          name: 'Karima Alaoui',
           portalToken: 'mock-uuid',
           establishmentId: 'est-1',
         }),
@@ -87,6 +88,12 @@ describe('PatientsService', () => {
 
     expect(result.imported).toBe(1)
     expect(result.total).toBe(1)
-    expect(mockPrisma.patient.create).toHaveBeenCalledTimes(1)
+    expect(mockPrisma.patient.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Karima Alaoui',
+        }),
+      }),
+    )
   })
 })

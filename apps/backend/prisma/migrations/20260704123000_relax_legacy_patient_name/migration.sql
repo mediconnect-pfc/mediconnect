@@ -1,0 +1,1 @@
+ALTER TABLE "patients" ALTER COLUMN "name" DROP NOT NULL;
