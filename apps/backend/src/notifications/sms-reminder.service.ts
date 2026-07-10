@@ -5,6 +5,7 @@ import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GomobileService } from './gomobile.service';
 import type { SmsDeliveryJobData } from './sms-delivery.service';
+import { getClinicTimeZone } from '../common/timezone';
 import {
   HOURS_BEFORE_REMINDER,
   MS_PER_HOUR,
@@ -36,12 +37,14 @@ export class SmsReminderService {
   buildMessage(params: ScheduleSmsReminderParams): string {
     const name = `${params.patientFirstName} ${params.patientLastName}`.trim();
     const date = params.slot.toLocaleDateString('fr-FR', {
+      timeZone: getClinicTimeZone(),
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
     const time = params.slot.toLocaleTimeString('fr-FR', {
+      timeZone: getClinicTimeZone(),
       hour: '2-digit',
       minute: '2-digit',
     });

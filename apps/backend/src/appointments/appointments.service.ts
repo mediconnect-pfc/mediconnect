@@ -8,6 +8,7 @@ import { CallReminderService } from '../notifications/call-reminder.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { FilterAppointmentDto } from './dto/filter-appointment.dto';
+import { zonedDateInput, zonedDayRange, zonedTimeInput, zonedTimeToUtc } from '../common/timezone';
 import { AppointmentStatus, ConfirmationStatus, Prisma, UserRole } from '@prisma/client';
 
 const appointmentInclude = {
@@ -35,12 +36,12 @@ export class AppointmentsService {
     return `${base}/patient?t=${encodeURIComponent(token)}`;
   }
 
-  private dayRange(date: Date) {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-    return { start, end };
+  private dayRange(date: Date | string) {
+    const range = zonedDayRange(typeof date === 'string' ? date : zonedDateInput(date));
+    if (!range) {
+      throw new BadRequestException('Date invalide');
+    }
+    return range;
   }
 
   async getOptions(establishmentId: string) {
@@ -66,7 +67,7 @@ export class AppointmentsService {
     };
 
     if (filters.date) {
-      const { start, end } = this.dayRange(new Date(filters.date));
+      const { start, end } = this.dayRange(filters.date);
       where.slot = { gte: start, lte: end };
     }
 
@@ -107,7 +108,7 @@ export class AppointmentsService {
     };
 
     if (filters.date) {
-      const { start, end } = this.dayRange(new Date(filters.date));
+      const { start, end } = this.dayRange(filters.date);
       where.slot = { gte: start, lte: end };
     }
 
@@ -202,8 +203,8 @@ export class AppointmentsService {
     const slot =
       dto.date || dto.time
         ? this.parseSlot(
-            dto.date ?? existing.slot.toISOString().slice(0, 10),
-            dto.time ?? existing.slot.toISOString().slice(11, 16),
+            dto.date ?? zonedDateInput(existing.slot),
+            dto.time ?? zonedTimeInput(existing.slot),
           )
         : undefined;
 
@@ -333,8 +334,8 @@ export class AppointmentsService {
   }
 
   private parseSlot(date: string, time: string) {
-    const slot = new Date(`${date}T${time}`);
-    if (Number.isNaN(slot.getTime())) {
+    const slot = zonedTimeToUtc(date, time);
+    if (!slot || Number.isNaN(slot.getTime())) {
       throw new BadRequestException('Date ou heure invalide');
     }
     return slot;

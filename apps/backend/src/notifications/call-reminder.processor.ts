@@ -15,6 +15,7 @@ import {
   buildCallTranscript,
   mapCallPatientAction,
 } from './call-result.mapper';
+import { zonedDateInput, zonedTimeInput } from '../common/timezone';
 import {
   CALL_POLL_INTERVAL_MS,
   CALL_POLL_MAX_WAIT_MS,
@@ -61,8 +62,8 @@ export class CallReminderProcessor extends WorkerHost {
     }
 
     const patientName = `${appointment.patient.firstName} ${appointment.patient.lastName}`.trim();
-    const appointmentDate = appointment.slot.toISOString().slice(0, 10);
-    const appointmentTime = appointment.slot.toISOString().slice(11, 16);
+    const appointmentDate = zonedDateInput(appointment.slot);
+    const appointmentTime = zonedTimeInput(appointment.slot);
     const clinicName = appointment.patient.establishment.name;
 
     try {

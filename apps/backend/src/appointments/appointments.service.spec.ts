@@ -109,6 +109,13 @@ describe('AppointmentsService', () => {
         portalLink: 'https://portal.mediconnect.ma/patient?t=portal-token-123',
       }),
     )
+    expect(mockPrisma.appointment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slot: new Date('2026-06-28T09:30:00.000Z'),
+        }),
+      }),
+    )
     expect(mockSmsReminderService.scheduleReminder).toHaveBeenCalled()
     expect(mockCallReminderService.scheduleReminder).toHaveBeenCalled()
   })

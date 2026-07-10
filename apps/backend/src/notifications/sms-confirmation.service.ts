@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GomobileService } from './gomobile.service';
 import type { SmsDeliveryJobData } from './sms-delivery.service';
 import { SMS_CONFIRMATION_QUEUE, SMS_JOB_NAME } from './sms-confirmation.constants';
+import { getClinicTimeZone } from '../common/timezone';
 
 export type SmsConfirmationJobData = SmsDeliveryJobData;
 
@@ -33,12 +34,14 @@ export class SmsConfirmationService {
   buildMessage(params: ScheduleSmsConfirmationParams): string {
     const name = `${params.patientFirstName} ${params.patientLastName}`.trim();
     const date = params.slot.toLocaleDateString('fr-FR', {
+      timeZone: getClinicTimeZone(),
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
     const time = params.slot.toLocaleTimeString('fr-FR', {
+      timeZone: getClinicTimeZone(),
       hour: '2-digit',
       minute: '2-digit',
     });
