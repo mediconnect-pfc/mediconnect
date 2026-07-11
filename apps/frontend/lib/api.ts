@@ -65,9 +65,20 @@ export interface DossierUpdateInput {
 export interface EstablishmentInput {
   name?: string
   type?: 'CLINIC' | 'HOSPITAL' | 'PHARMACY'
+  plan?: 'FREE' | 'BASIC' | 'PREMIUM'
   phone?: string
   address?: string | null
-  settings?: any
+  isActive?: boolean
+  settings?: unknown
+}
+
+export interface CreateEstablishmentInput {
+  name: string
+  type: 'CLINIC' | 'HOSPITAL' | 'PHARMACY'
+  plan: 'FREE' | 'BASIC' | 'PREMIUM'
+  phone: string
+  address?: string | null
+  settings?: unknown
 }
 
 export interface CreateUserInput {
@@ -106,6 +117,44 @@ export async function updateEstablishment(token: string, id: string, data: Estab
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.message || 'Erreur mise a jour etablissement')
+  }
+
+  return res.json()
+}
+
+export async function getEstablishments(token: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/establishments`, {
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) throw new Error('Erreur chargement etablissements')
+  return res.json()
+}
+
+export async function createEstablishment(token: string, data: CreateEstablishmentInput) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/establishments`, {
+    method: 'POST',
+    headers: authHeadersWithToken(token),
+    body: JSON.stringify(data),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur creation etablissement')
+  }
+
+  return res.json()
+}
+
+export async function deactivateEstablishment(token: string, id: string) {
+  const res = await handleAuthResponse(await fetch(`${API_URL}/establishments/${id}`, {
+    method: 'DELETE',
+    headers: authHeadersWithToken(token),
+  }))
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || 'Erreur desactivation etablissement')
   }
 
   return res.json()

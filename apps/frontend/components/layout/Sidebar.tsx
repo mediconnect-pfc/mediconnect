@@ -41,7 +41,15 @@ const adminItems: NavItem[] = [
   { label: 'Consultations', href: '/dashboard/dossiers', icon: Stethoscope },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Campagnes', href: '/dashboard/campaigns', icon: Megaphone },
-  { label: 'Clinics', href: '/dashboard/clinics', icon: Building2, comingSoon: true },
+  { label: 'Financials', href: '/dashboard/financials', icon: CreditCard, comingSoon: true },
+  { label: 'IA Monitoring', href: '/dashboard/ia-monitoring', icon: Bot, comingSoon: true },
+]
+
+const superAdminItems: NavItem[] = [
+  { label: 'Consultations', href: '/dashboard/dossiers', icon: Stethoscope },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { label: 'Campagnes', href: '/dashboard/campaigns', icon: Megaphone },
+  { label: 'Clinics', href: '/dashboard/clinics', icon: Building2 },
   { label: 'Financials', href: '/dashboard/financials', icon: CreditCard, comingSoon: true },
   { label: 'IA Monitoring', href: '/dashboard/ia-monitoring', icon: Bot, comingSoon: true },
 ]
@@ -53,7 +61,11 @@ const staffItems: NavItem[] = [
 const settingsItem: NavItem = { label: 'Paramètres', href: '/dashboard/settings', icon: Settings }
 
 function getNavItems(role: string): NavItem[] {
-  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+  if (role === 'SUPER_ADMIN') {
+    return [...baseItems, ...superAdminItems, settingsItem]
+  }
+
+  if (role === 'ADMIN') {
     return [...baseItems, ...adminItems, settingsItem]
   }
 
