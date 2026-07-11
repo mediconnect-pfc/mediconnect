@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { ConfigService } from '@nestjs/config';
 import { CampaignStatus, CampaignType, MessageStatus } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,8 +16,30 @@ type CampaignContact = {
 export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     @InjectQueue(CAMPAIGN_QUEUE) private readonly queue: Queue,
   ) {}
+
+  private getMaxContacts(): number {
+    const raw = this.config.get<string>('CAMPAIGN_MAX_CONTACTS', '200');
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 200;
+  }
+
+  private getJobSpacingMs(): number {
+    const raw = this.config.get<string>('CAMPAIGN_JOB_SPACING_MS', '250');
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 250;
+  }
+
+  private ensureContactLimit(count: number) {
+    const maxContacts = this.getMaxContacts();
+    if (count > maxContacts) {
+      throw new BadRequestException(
+        `Campagne trop volumineuse pour l'environnement actuel: ${count} contacts, maximum ${maxContacts}.`,
+      );
+    }
+  }
 
   private normalizePhone(value?: string | null) {
     return value?.trim() ?? '';
@@ -35,6 +58,7 @@ export class CampaignsService {
     delay?: number;
   }) {
     const { campaignId, contacts, campaignMessage, campaignType, delay = 0 } = params;
+    const jobSpacingMs = this.getJobSpacingMs();
 
     if (contacts.length === 0) {
       return [];
@@ -69,7 +93,7 @@ export class CampaignsService {
           } satisfies CampaignJobData,
           {
             jobId: `campaign-${message.id}`,
-            delay,
+            delay: delay + index * jobSpacingMs,
             attempts: 2,
             backoff: { type: 'exponential', delay: 15_000 },
             removeOnComplete: true,
@@ -206,6 +230,8 @@ export class CampaignsService {
       patientId: patient.id,
     }));
 
+    this.ensureContactLimit(contacts.length);
+
     await this.prisma.campaign.update({
       where: { id: campaign.id },
       data: {
@@ -281,6 +307,8 @@ export class CampaignsService {
     if (validContacts.length === 0) {
       throw new BadRequestException('Aucun contact valide dans le fichier CSV');
     }
+
+    this.ensureContactLimit(validContacts.length);
 
     const launchAt =
       campaign.type === CampaignType.EMERGENCY
